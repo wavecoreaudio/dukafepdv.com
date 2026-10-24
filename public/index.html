@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDV - DUKAFE</title>
+  <script src="/vendor/tailwind.js"></script>
+  <script src="/js/tailwind-config.js"></script>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <main class="app-main flex" style="overflow:hidden">
+      <!-- Produtos (70%) -->
+      <section class="flex flex-col h-full p-5 gap-4" style="width:70%">
+        <header class="flex items-center gap-3">
+          <div class="flex-1 relative">
+            <span class="absolute left-4 top-1/2 -translate-y-1/2 opacity-60">🔍</span>
+            <input id="search" class="input" style="padding-left:42px;font-size:16px;padding-top:12px;padding-bottom:12px"
+              placeholder="Buscar produto... (F2)" autocomplete="off">
+          </div>
+          <div class="text-sm opacity-70 hidden xl:block">
+            <span class="kbd">F2</span> busca &nbsp; <span class="kbd">Esc</span> limpar &nbsp; <span class="kbd">F9</span> finalizar
+          </div>
+        </header>
+
+        <div id="cash-warning" class="hidden card px-4 py-3 flex items-center justify-between" style="border-color:rgba(240,160,75,.5);background:rgba(240,160,75,.12)">
+          <span>⚠️ <strong>Caixa fechado.</strong> Abra o caixa para registrar vendas.</span>
+          <a href="/caixa.html" class="btn btn-warning btn-sm">Abrir caixa</a>
+        </div>
+
+        <nav id="categories" class="flex gap-2 overflow-x-auto no-scrollbar pb-1"></nav>
+
+        <div class="flex-1 overflow-y-auto pr-1" id="products-scroll">
+          <div id="top-sellers-section" class="mb-5 hidden">
+            <h2 class="text-sm font-bold uppercase tracking-wider mb-3" style="color:var(--accent)">⭐ Mais vendidos</h2>
+            <div id="top-sellers" class="grid gap-3" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))"></div>
+          </div>
+          <h2 id="grid-title" class="text-sm font-bold uppercase tracking-wider mb-3 opacity-70">Todos os produtos</h2>
+          <div id="products" class="grid gap-3" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))"></div>
+        </div>
+      </section>
+
+      <!-- Carrinho (30%) -->
+      <aside class="flex flex-col h-full" style="width:30%;min-width:300px;background:var(--cafe-dark);border-left:1px solid rgba(245,230,211,.08)">
+        <div class="flex items-center justify-between px-5 py-4" style="border-bottom:1px solid rgba(245,230,211,.08)">
+          <div class="flex items-center gap-3">
+            <div class="relative text-2xl">🛒<span id="cart-badge" class="cart-badge">0</span></div>
+            <h2 class="text-lg font-extrabold ml-2">Pedido atual</h2>
+          </div>
+          <button id="btn-clear" class="btn btn-ghost btn-sm">Limpar</button>
+        </div>
+
+        <div id="cart-items" class="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2"></div>
+
+        <div class="px-5 py-4" style="border-top:1px solid rgba(245,230,211,.08)">
+          <div class="flex justify-between text-sm opacity-75 mb-1"><span>Itens</span><span id="cart-count">0</span></div>
+          <div class="flex justify-between text-sm opacity-75 mb-3"><span>Subtotal</span><span id="cart-subtotal">R$ 0,00</span></div>
+          <div class="flex justify-between items-end mb-4">
+            <span class="text-lg font-bold">TOTAL</span>
+            <span id="cart-total" class="text-4xl font-extrabold" style="color:var(--bege)">R$ 0,00</span>
+          </div>
+          <button id="btn-checkout" class="btn btn-accent btn-lg w-full" disabled>FINALIZAR VENDA <span class="kbd" style="color:var(--cafe-dark);background:rgba(0,0,0,.1)">F9</span></button>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <!-- Modal pagamento -->
+  <div id="modal-payment" class="modal-backdrop" data-static="1">
+    <div class="modal">
+      <div id="payment-form" class="p-6">
+        <div class="flex justify-between items-center mb-1">
+          <h3 class="text-xl font-extrabold">Pagamento</h3>
+          <button class="btn btn-ghost btn-sm" data-close-modal>✕</button>
+        </div>
+        <p class="text-sm opacity-70 mb-4">Total a pagar</p>
+        <div id="pay-total" class="text-5xl font-extrabold mb-6 text-center">R$ 0,00</div>
+
+        <div class="grid grid-cols-2 gap-3 mb-5">
+          <button class="pay-btn" data-method="dinheiro"><span class="pay-icon">💵</span>Dinheiro<span class="pay-key">tecla 1</span></button>
+          <button class="pay-btn" data-method="pix"><span class="pay-icon">📱</span>Pix<span class="pay-key">tecla 2</span></button>
+          <button class="pay-btn" data-method="debito"><span class="pay-icon">💳</span>Débito<span class="pay-key">tecla 3</span></button>
+          <button class="pay-btn" data-method="credito"><span class="pay-icon">💳</span>Crédito<span class="pay-key">tecla 4</span></button>
+        </div>
+
+        <div id="cash-fields" class="hidden mb-5">
+          <label class="label" for="amount-received">Valor recebido</label>
+          <input id="amount-received" class="input text-2xl font-bold" inputmode="decimal" placeholder="0,00" autocomplete="off">
+          <div id="quick-cash" class="flex gap-2 mt-2 flex-wrap"></div>
+          <div class="card mt-3 p-4 flex justify-between items-center">
+            <span class="font-semibold">Troco</span>
+            <span id="change-value" class="text-3xl font-extrabold">R$ 0,00</span>
+          </div>
+        </div>
+
+        <button id="btn-confirm-payment" class="btn btn-success btn-lg w-full" disabled>CONFIRMAR PAGAMENTO <span class="kbd" style="background:rgba(0,0,0,.1);color:#142b10">Enter</span></button>
+      </div>
+
+      <div id="payment-success" class="hidden p-8 text-center">
+        <div class="success-check"><svg viewBox="0 0 52 52"><path d="M14 27l8 8 16-17"/></svg></div>
+        <h3 class="text-2xl font-extrabold mt-5">Venda concluída!</h3>
+        <p id="success-info" class="opacity-80 mt-2"></p>
+        <div id="success-change" class="text-4xl font-extrabold mt-3"></div>
+        <button id="btn-new-sale" class="btn btn-primary btn-lg w-full mt-6">NOVA VENDA <span class="kbd">Enter</span></button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/pdv.js"></script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estoque - DUKAFE</title>
+  <script src="/vendor/tailwind.js"></script>
+  <script src="/js/tailwind-config.js"></script>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <main class="app-main p-6">
+      <header class="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 class="text-3xl font-extrabold">📦 Controle de Estoque</h1>
+          <p class="opacity-70 text-sm mt-1">Cadastre produtos, ajuste preços e reponha o estoque.</p>
+        </div>
+        <button id="btn-new" class="btn btn-accent btn-lg">+ NOVO PRODUTO</button>
+      </header>
+
+      <section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="stat-card"><div class="stat-label">Produtos ativos</div><div id="st-total" class="stat-value">0</div></div>
+        <div class="stat-card"><div class="stat-label">Estoque baixo</div><div id="st-low" class="stat-value" style="color:var(--warning)">0</div></div>
+        <div class="stat-card"><div class="stat-label">Sem estoque</div><div id="st-out" class="stat-value" style="color:var(--danger)">0</div></div>
+        <div class="stat-card"><div class="stat-label">Valor em estoque (custo)</div><div id="st-value" class="stat-value">R$ 0,00</div></div>
+      </section>
+
+      <section class="flex flex-wrap gap-3 mb-4">
+        <div class="relative flex-1" style="min-width:240px">
+          <span class="absolute left-4 top-1/2 -translate-y-1/2 opacity-60">🔍</span>
+          <input id="search" class="input" style="padding-left:42px" placeholder="Buscar por nome ou categoria...">
+        </div>
+        <select id="filter-category" class="input" style="width:200px"></select>
+        <select id="filter-status" class="input" style="width:200px">
+          <option value="all">Todos os status</option>
+          <option value="low">Estoque baixo</option>
+          <option value="out">Sem estoque</option>
+          <option value="ok">Estoque OK</option>
+        </select>
+      </section>
+
+      <div class="card overflow-x-auto">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Nome</th><th>Categoria</th><th>Custo</th><th>Preço venda</th><th>Margem</th><th>Estoque</th><th>Status</th><th style="text-align:right">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal produto -->
+  <div id="modal-product" class="modal-backdrop">
+    <div class="modal">
+      <form id="product-form" class="p-6" novalidate>
+        <div class="flex justify-between items-center mb-5">
+          <h3 id="product-modal-title" class="text-xl font-extrabold">Novo produto</h3>
+          <button type="button" class="btn btn-ghost btn-sm" data-close-modal>✕</button>
+        </div>
+        <input type="hidden" id="p-id">
+        <div class="grid grid-cols-2 gap-4">
+          <div class="col-span-2">
+            <label class="label" for="p-name">Nome *</label>
+            <input id="p-name" class="input" maxlength="80" data-autofocus>
+          </div>
+          <div class="col-span-2">
+            <label class="label" for="p-category">Categoria *</label>
+            <select id="p-category" class="input"></select>
+          </div>
+          <div>
+            <label class="label" for="p-cost">Preço de custo (R$)</label>
+            <input id="p-cost" class="input" inputmode="decimal" placeholder="0,00">
+          </div>
+          <div>
+            <label class="label" for="p-price">Preço de venda (R$) *</label>
+            <input id="p-price" class="input" inputmode="decimal" placeholder="0,00">
+          </div>
+          <div>
+            <label class="label" for="p-stock" id="p-stock-label">Estoque inicial</label>
+            <input id="p-stock" class="input" type="number" min="0" step="1" value="0">
+          </div>
+          <div>
+            <label class="label" for="p-min">Estoque mínimo</label>
+            <input id="p-min" class="input" type="number" min="0" step="1" value="5">
+          </div>
+        </div>
+        <p id="form-error" class="hidden mt-4 text-sm font-semibold" style="color:#ff9c8f"></p>
+        <div class="flex justify-between gap-3 mt-6">
+          <button type="button" id="btn-delete" class="btn btn-ghost hidden" style="color:#ff9c8f;border-color:rgba(224,93,75,.4)">Desativar</button>
+          <div class="flex gap-3 ml-auto">
+            <button type="button" class="btn btn-ghost" data-close-modal>Cancelar</button>
+            <button type="submit" id="btn-save" class="btn btn-primary">Salvar</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal reposição -->
+  <div id="modal-restock" class="modal-backdrop">
+    <div class="modal" style="max-width:420px">
+      <form id="restock-form" class="p-6" novalidate>
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-extrabold">Repor estoque</h3>
+          <button type="button" class="btn btn-ghost btn-sm" data-close-modal>✕</button>
+        </div>
+        <input type="hidden" id="r-id">
+        <div class="card p-4 mb-4">
+          <div id="r-name" class="font-bold text-lg"></div>
+          <div class="text-sm opacity-75 mt-1">Estoque atual: <strong id="r-current"></strong></div>
+        </div>
+        <label class="label" for="r-qty">Quantidade a adicionar</label>
+        <input id="r-qty" class="input text-2xl font-bold" type="number" min="1" step="1" data-autofocus>
+        <div class="flex gap-2 mt-2">
+          <button type="button" class="btn btn-ghost btn-sm" data-add="5">+5</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-add="10">+10</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-add="20">+20</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-add="50">+50</button>
+        </div>
+        <p class="text-sm opacity-75 mt-3">Novo estoque: <strong id="r-new"></strong></p>
+        <div class="flex justify-end gap-3 mt-6">
+          <button type="button" class="btn btn-ghost" data-close-modal>Cancelar</button>
+          <button type="submit" id="btn-restock" class="btn btn-success">Confirmar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/estoque.js"></script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Caixa - DUKAFE</title>
+  <script src="/vendor/tailwind.js"></script>
+  <script src="/js/tailwind-config.js"></script>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <main class="app-main p-6">
+      <h1 class="text-3xl font-extrabold mb-6">💰 Caixa Diário</h1>
+
+      <section id="closed-view" class="hidden">
+        <div class="card p-8 mx-auto text-center" style="max-width:440px">
+          <div class="text-6xl mb-3">🔒</div>
+          <h2 class="text-2xl font-extrabold">Caixa fechado</h2>
+          <p class="opacity-70 mt-1 mb-6">Informe o fundo de troco para iniciar o dia.</p>
+          <label class="label text-left" for="opening">Fundo de caixa (R$)</label>
+          <input id="opening" class="input text-2xl font-bold text-center" inputmode="decimal" placeholder="0,00">
+          <button id="btn-open" class="btn btn-success btn-lg w-full mt-5">ABRIR CAIXA</button>
+        </div>
+      </section>
+
+      <section id="open-view" class="hidden">
+        <div class="card p-5 flex flex-wrap justify-between items-center gap-4 mb-6">
+          <div class="flex items-center gap-3">
+            <span class="status-dot open"></span>
+            <div>
+              <div class="text-xl font-extrabold">Caixa Aberto</div>
+              <div class="text-sm opacity-75">Aberto em <span id="opened-at"></span> • Fundo inicial: <strong id="opening-balance"></strong></div>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button id="btn-sangria" class="btn btn-warning">➖ SANGRIA</button>
+            <button id="btn-suprimento" class="btn btn-accent">➕ SUPRIMENTO</button>
+            <button id="btn-close" class="btn btn-danger">FECHAR CAIXA</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <div class="stat-card"><div class="stat-label">💵 Dinheiro</div><div id="s-dinheiro" class="stat-value"></div><div id="c-dinheiro" class="stat-sub"></div></div>
+          <div class="stat-card"><div class="stat-label">📱 Pix</div><div id="s-pix" class="stat-value"></div><div id="c-pix" class="stat-sub"></div></div>
+          <div class="stat-card"><div class="stat-label">💳 Débito</div><div id="s-debito" class="stat-value"></div><div id="c-debito" class="stat-sub"></div></div>
+          <div class="stat-card"><div class="stat-label">💳 Crédito</div><div id="s-credito" class="stat-value"></div><div id="c-credito" class="stat-sub"></div></div>
+        </div>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div class="stat-card"><div class="stat-label">Total de vendas</div><div id="s-total" class="stat-value"></div><div id="c-total" class="stat-sub"></div></div>
+          <div class="stat-card"><div class="stat-label">Sangrias</div><div id="s-sangrias" class="stat-value" style="color:var(--warning)"></div></div>
+          <div class="stat-card"><div class="stat-label">Suprimentos</div><div id="s-suprimentos" class="stat-value" style="color:var(--accent)"></div></div>
+          <div class="stat-card highlight"><div class="stat-label">Saldo esperado em caixa</div><div id="s-expected" class="stat-value"></div><div class="stat-sub">Fundo + dinheiro + suprimentos − sangrias</div></div>
+        </div>
+
+        <h2 class="text-lg font-bold mb-3">Movimentações do dia</h2>
+        <div class="card overflow-x-auto">
+          <table class="table">
+            <thead><tr><th>Hora</th><th>Tipo</th><th>Descrição</th><th style="text-align:right">Valor</th></tr></thead>
+            <tbody id="movements"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal movimento -->
+  <div id="modal-movement" class="modal-backdrop">
+    <div class="modal" style="max-width:420px">
+      <form id="movement-form" class="p-6" novalidate>
+        <h3 id="movement-title" class="text-xl font-extrabold mb-4"></h3>
+        <input type="hidden" id="m-type">
+        <label class="label" for="m-amount">Valor (R$)</label>
+        <input id="m-amount" class="input text-2xl font-bold" inputmode="decimal" placeholder="0,00" data-autofocus>
+        <label class="label mt-4" for="m-desc">Motivo</label>
+        <input id="m-desc" class="input" maxlength="120" placeholder="Ex.: depósito bancário, troco extra...">
+        <div class="flex justify-end gap-3 mt-6">
+          <button type="button" class="btn btn-ghost" data-close-modal>Cancelar</button>
+          <button type="submit" id="btn-movement" class="btn btn-primary">Confirmar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal fechamento -->
+  <div id="modal-close" class="modal-backdrop">
+    <div class="modal">
+      <form id="close-form" class="p-6" novalidate>
+        <h3 class="text-xl font-extrabold mb-4">Fechamento de caixa</h3>
+        <div class="card p-4 text-sm flex flex-col gap-2">
+          <div class="flex justify-between"><span>Fundo inicial</span><span id="f-opening"></span></div>
+          <div class="flex justify-between"><span>+ Vendas em dinheiro</span><span id="f-cash"></span></div>
+          <div class="flex justify-between"><span>+ Suprimentos</span><span id="f-sup"></span></div>
+          <div class="flex justify-between"><span>− Sangrias</span><span id="f-san"></span></div>
+          <div class="flex justify-between text-lg font-extrabold pt-2" style="border-top:1px solid rgba(245,230,211,.15)"><span>= Saldo esperado</span><span id="f-expected"></span></div>
+        </div>
+        <div class="card p-4 text-sm mt-3 flex flex-col gap-1 opacity-90">
+          <div class="flex justify-between"><span>Pix</span><span id="f-pix"></span></div>
+          <div class="flex justify-between"><span>Débito</span><span id="f-deb"></span></div>
+          <div class="flex justify-between"><span>Crédito</span><span id="f-cre"></span></div>
+          <div class="flex justify-between font-bold"><span>Total geral de vendas</span><span id="f-total"></span></div>
+        </div>
+        <label class="label mt-4" for="f-counted">Valor contado em dinheiro (R$)</label>
+        <input id="f-counted" class="input text-2xl font-bold" inputmode="decimal" placeholder="0,00" data-autofocus>
+        <div class="flex justify-between items-center mt-3 text-lg font-extrabold"><span>Diferença</span><span id="f-diff">-</span></div>
+        <div class="flex justify-end gap-3 mt-6">
+          <button type="button" class="btn btn-ghost" data-close-modal>Cancelar</button>
+          <button type="submit" id="btn-confirm-close" class="btn btn-danger">Confirmar fechamento</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/caixa.js"></script>
+</body>
+</html>

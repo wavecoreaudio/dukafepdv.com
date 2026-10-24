@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Histórico - DUKAFE</title>
+  <script src="/vendor/tailwind.js"></script>
+  <script src="/js/tailwind-config.js"></script>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <main class="app-main p-6">
+      <header class="flex flex-wrap items-end justify-between gap-4 mb-6">
+        <div>
+          <h1 class="text-3xl font-extrabold">🧾 Histórico de Vendas</h1>
+          <p class="opacity-70 text-sm mt-1">Consulte, detalhe e cancele vendas.</p>
+        </div>
+        <div class="flex items-end gap-2">
+          <div>
+            <label class="label" for="date">Data</label>
+            <input id="date" type="date" class="input" style="color-scheme:dark">
+          </div>
+          <button id="btn-today" class="btn btn-ghost">Hoje</button>
+        </div>
+      </header>
+
+      <section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="stat-card"><div class="stat-label">Vendas ativas</div><div id="h-count" class="stat-value">0</div></div>
+        <div class="stat-card"><div class="stat-label">Faturamento</div><div id="h-total" class="stat-value">R$ 0,00</div></div>
+        <div class="stat-card"><div class="stat-label">Ticket médio</div><div id="h-avg" class="stat-value">R$ 0,00</div></div>
+        <div class="stat-card"><div class="stat-label">Canceladas</div><div id="h-cancel" class="stat-value" style="color:var(--danger)">0</div></div>
+      </section>
+
+      <div class="card overflow-x-auto">
+        <table class="table">
+          <thead><tr><th>Horário</th><th>Nº venda</th><th>Itens</th><th>Pagamento</th><th>Total</th><th>Status</th><th style="text-align:right">Ações</th></tr></thead>
+          <tbody id="tbody"></tbody>
+          <tfoot><tr><td colspan="4">Total do período (vendas ativas)</td><td id="foot-total" colspan="3">R$ 0,00</td></tr></tfoot>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <div id="modal-details" class="modal-backdrop">
+    <div class="modal modal-lg">
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 id="d-title" class="text-xl font-extrabold"></h3>
+          <button class="btn btn-ghost btn-sm" data-close-modal>✕</button>
+        </div>
+        <div id="d-meta" class="text-sm opacity-80 mb-4"></div>
+        <div class="card overflow-hidden">
+          <table class="table">
+            <thead><tr><th>Produto</th><th>Qtd</th><th>Unitário</th><th style="text-align:right">Subtotal</th></tr></thead>
+            <tbody id="d-items"></tbody>
+          </table>
+        </div>
+        <div id="d-totals" class="mt-4 text-right"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-cancel" class="modal-backdrop">
+    <div class="modal" style="max-width:420px">
+      <div class="p-6 text-center">
+        <div class="text-5xl mb-2">⚠️</div>
+        <h3 class="text-xl font-extrabold">Cancelar venda <span id="c-id"></span>?</h3>
+        <p class="opacity-75 mt-2 text-sm">Os itens voltarão ao estoque e um estorno de <strong id="c-total"></strong> será registrado no caixa.</p>
+        <div class="flex justify-center gap-3 mt-6">
+          <button class="btn btn-ghost" data-close-modal>Voltar</button>
+          <button id="btn-confirm-cancel" class="btn btn-danger">Sim, cancelar venda</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/historico.js"></script>
+</body>
+</html>
