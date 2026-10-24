@@ -6,28 +6,42 @@ const formatMoney = (v) => BRL.format(Number(v) || 0);
 const PAYMENT_LABELS = { dinheiro: 'Dinheiro', pix: 'Pix', debito: 'Débito', credito: 'Crédito' };
 const PAYMENT_ICONS = { dinheiro: '💵', pix: '📱', debito: '💳', credito: '💳' };
 
-/** Converte "YYYY-MM-DD HH:MM:SS" em Date local */
+/** Converte qualquer formato de data em Date local válido */
 function parseDate(str) {
   if (!str) return null;
+  // Se vier no formato ISO do JS (ex: 2026-10-24T17:00:00.000Z)
+  const dIso = new Date(str);
+  if (!isNaN(dIso.getTime()) && str.includes('T')) {
+    return dIso;
+  }
+  // Formato manual "YYYY-MM-DD HH:MM:SS"
   const [d, t = '00:00:00'] = str.split(' ');
-  const [y, m, day] = d.split('-').map(Number);
+  const partsD = d.split('-').map(Number);
+  if (partsD.length !== 3) return null;
+  const [y, m, day] = partsD;
   const [h, mi, s] = t.split(':').map(Number);
-  return new Date(y, m - 1, day, h, mi, s || 0);
+  return new Date(y, m - 1, day, h || 0, mi || 0, s || 0);
 }
+
 const pad = (n) => String(n).padStart(2, '0');
+
 function formatDateTime(str) {
   const d = parseDate(str);
-  if (!d) return '-';
+  if (!d || isNaN(d.getTime())) return '-';
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
 function formatTime(str) {
   const d = parseDate(str);
-  return d ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : '-';
+  if (!d || isNaN(d.getTime())) return '-';
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
 function todayISO() {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
+
 /** Aceita "12,50" ou "12.50" */
 function parseMoney(v) {
   if (typeof v === 'number') return v;
@@ -36,6 +50,7 @@ function parseMoney(v) {
   const normalized = s.includes(',') ? s.replace(/\./g, '').replace(',', '.') : s;
   return Number(normalized);
 }
+
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
@@ -96,13 +111,16 @@ function openModal(id) {
   const first = m.querySelector('[data-autofocus]') || m.querySelector('input:not([type=hidden]), select');
   if (first) setTimeout(() => first.focus(), 60);
 }
+
 function closeModal(id) {
   const m = document.getElementById(id);
   if (m) m.classList.remove('open');
 }
+
 function anyModalOpen() {
   return document.querySelector('.modal-backdrop.open');
 }
+
 document.addEventListener('click', (e) => {
   if (e.target.classList && e.target.classList.contains('modal-backdrop') && !e.target.dataset.static) {
     e.target.classList.remove('open');
@@ -141,15 +159,17 @@ function renderSidebar(active) {
   clock();
   setInterval(clock, 15000);
 }
+
 async function updateSidebarStatus() {
   const el = document.getElementById('sidebar-status');
   if (!el) return null;
   try {
-    const { session } = await api('/api/cash/session');
-    el.innerHTML = session
+    const data = await api('/api/cash/status');
+    const isOpen = data && data.open;
+    el.innerHTML = isOpen
       ? '<div><span class="status-dot open"></span></div><div>Caixa<br>aberto</div>'
       : '<div><span class="status-dot closed"></span></div><div>Caixa<br>fechado</div>';
-    return session;
+    return isOpen ? data.session : null;
   } catch (e) {
     el.innerHTML = '<div><span class="status-dot closed"></span></div><div>Offline</div>';
     return null;

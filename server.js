@@ -149,22 +149,79 @@ app.get('/api/cash/session', wrap((req, res) => {
 app.get('/api/cash/summary', wrap((req, res) => {
     const session = getActiveSession();
     if (!session) {
-        return res.json({ open: false, total_sales: 0, items_sold: 0 });
+        return res.json({ open: false, session: null });
     }
-    const summary = db.prepare(`
-        SELECT COALESCE(SUM(final_amount), 0) as total_sales,
-               COALESCE(SUM(si.quantity), 0) as items_sold
-        FROM sales s
-        LEFT JOIN sale_items si ON s.id = si.sale_id
-        WHERE s.cash_session_id = ?
-    `).get(session.id);
+
+    const sales = db.prepare(`
+        SELECT * FROM sales 
+        WHERE cash_session_id = ?
+    `).all(session.id);
+
+    let movements = [];
+    try {
+        movements = db.prepare(`
+            SELECT * FROM cash_movements 
+            WHERE cash_session_id = ? 
+            ORDER BY created_at DESC
+        `).all(session.id);
+    } catch (e) {
+        movements = [];
+    }
+
+    const sales_by_method = { dinheiro: 0, pix: 0, debito: 0, credito: 0 };
+    const sales_count_by_method = { dinheiro: 0, pix: 0, debito: 0, credito: 0 };
+    
+    let total_sales = 0;
+    let cancelled_count = 0;
+
+    sales.forEach(s => {
+        const method = (s.payment_method || '').toLowerCase();
+        let key = method;
+        if (method === 'cartao_credito') key = 'credito';
+        if (method === 'cartao_debito') key = 'debito';
+
+        if (sales_by_method.hasOwnProperty(key)) {
+            sales_by_method[key] += s.final_amount;
+            sales_count_by_method[key] += 1;
+        }
+        total_sales += s.final_amount;
+    });
+
+    let sangrias = 0;
+    let suprimentos = 0;
+    movements.forEach(m => {
+        if (m.type === 'sangria') sangrias += m.amount;
+        if (m.type === 'suprimento') suprimentos += m.amount;
+    });
+
+    const expected_cash = session.opening_balance + sales_by_method.dinheiro + suprimentos - sangrias;
 
     res.json({
         open: true,
         session,
-        total_sales: summary.total_sales,
-        items_sold: summary.items_sold
+        sales_by_method,
+        sales_count_by_method,
+        total_sales,
+        sales_count: sales.length,
+        cancelled_count,
+        sangrias,
+        suprimentos,
+        expected_cash,
+        movements
     });
+}));
+
+// Rota para histórico de sessões de caixa
+app.get('/api/cash/sessions', wrap((req, res) => {
+    const sessions = db.prepare(`
+        SELECT cs.*, 
+               (SELECT COALESCE(SUM(final_amount), 0) FROM sales WHERE cash_session_id = cs.id) as total_sales,
+               (SELECT COUNT(*) FROM sales WHERE cash_session_id = cs.id) as sales_count
+        FROM cash_sessions cs
+        ORDER BY cs.opened_at DESC
+        LIMIT 50
+    `).all();
+    res.json(sessions);
 }));
 
 app.post('/api/cash/open', wrap((req, res) => {
@@ -185,8 +242,8 @@ app.post('/api/cash/close', wrap((req, res) => {
     const session = getActiveSession();
     if (!session) throw new AppError('Nenhum caixa aberto no momento.');
 
-    const closing_counted = parseFloat(req.body.closing_counted);
-    if (isNaN(closing_counted)) throw new AppError('Informe o valor contado em caixa.');
+    const counted_amount = parseFloat(req.body.counted_amount);
+    if (isNaN(counted_amount)) throw new AppError('Informe o valor contado em caixa.');
 
     const salesSummary = db.prepare(`
         SELECT COALESCE(SUM(final_amount), 0) as total_sales 
@@ -194,17 +251,70 @@ app.post('/api/cash/close', wrap((req, res) => {
         WHERE cash_session_id = ?
     `).get(session.id);
 
-    const closing_expected = session.opening_balance + salesSummary.total_sales;
+    let movements = [];
+    try {
+        movements = db.prepare('SELECT * FROM cash_movements WHERE cash_session_id = ?').all(session.id);
+    } catch (e) {}
+
+    let sangrias = 0;
+    let suprimentos = 0;
+    movements.forEach(m => {
+        if (m.type === 'sangria') sangrias += m.amount;
+        if (m.type === 'suprimento') suprimentos += m.amount;
+    });
+
+    const sales = db.prepare('SELECT * FROM sales WHERE cash_session_id = ?').all(session.id);
+    let dinheiro = 0;
+    sales.forEach(s => {
+        if ((s.payment_method || '').toLowerCase() === 'dinheiro') dinheiro += s.final_amount;
+    });
+
+    const expected_cash = session.opening_balance + dinheiro + suprimentos - sangrias;
+    const difference = Math.round((counted_amount - expected_cash) * 100) / 100;
     const closed_at = new Date().toISOString();
 
     db.prepare(`
         UPDATE cash_sessions 
         SET closed_at = ?, closing_counted = ?, closing_expected = ?, status = 'closed'
         WHERE id = ?
-    `).run(closed_at, closing_counted, closing_expected, session.id);
+    `).run(closed_at, counted_amount, expected_cash, session.id);
 
     const closedSession = db.prepare('SELECT * FROM cash_sessions WHERE id = ?').get(session.id);
-    res.json(closedSession);
+    res.json({ ...closedSession, total_sales: salesSummary.total_sales, difference });
+}));
+
+app.post('/api/cash/movement', wrap((req, res) => {
+    const session = getActiveSession();
+    if (!session) throw new AppError('Nenhum caixa aberto.');
+
+    const { type, amount, description } = req.body;
+    if (!['sangria', 'suprimento'].includes(type)) throw new AppError('Tipo de movimentação inválido.');
+    const val = parseFloat(amount);
+    if (!(val > 0)) throw new AppError('Valor inválido.');
+
+    try {
+        db.prepare(`
+            INSERT INTO cash_movements (cash_session_id, type, amount, description, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        `).run(session.id, type, val, description || '', new Date().toISOString());
+    } catch (e) {
+        db.exec(`
+            CREATE TABLE IF NOT EXISTS cash_movements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cash_session_id INTEGER,
+                type TEXT,
+                amount REAL,
+                description TEXT,
+                created_at TEXT
+            )
+        `);
+        db.prepare(`
+            INSERT INTO cash_movements (cash_session_id, type, amount, description, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        `).run(session.id, type, val, description || '', new Date().toISOString());
+    }
+
+    res.status(201).json({ success: true });
 }));
 
 // --------- Vendas ---------
@@ -269,6 +379,39 @@ app.post('/api/sales', wrap((req, res) => {
 app.get('/api/sales', wrap((req, res) => {
     const sales = db.prepare('SELECT * FROM sales ORDER BY created_at DESC LIMIT 50').all();
     res.json(sales);
+}));
+
+app.get('/api/sales/:id', wrap((req, res) => {
+    const sale = db.prepare('SELECT * FROM sales WHERE id = ?').get(req.params.id);
+    if (!sale) throw new AppError('Venda não encontrada.', 404);
+
+    const items = db.prepare(`
+        SELECT si.*, p.name as product_name 
+        FROM sale_items si 
+        LEFT JOIN products p ON si.product_id = p.id 
+        WHERE si.sale_id = ?
+    `).all(sale.id);
+
+    res.json({ ...sale, items });
+}));
+
+app.post('/api/sales/:id/cancel', wrap((req, res) => {
+    const saleId = req.params.id;
+    const sale = db.prepare('SELECT * FROM sales WHERE id = ?').get(saleId);
+    if (!sale) throw new AppError('Venda não encontrada.', 404);
+    if (sale.status === 'cancelled') throw new AppError('Esta venda já está cancelada.');
+
+    const cancelTransaction = db.transaction(() => {
+        db.prepare("UPDATE sales SET status = 'cancelled' WHERE id = ?").run(saleId);
+        const items = db.prepare('SELECT * FROM sale_items WHERE sale_id = ?').all(saleId);
+        const restockStmt = db.prepare('UPDATE products SET stock = stock + ? WHERE id = ?');
+        for (const item of items) {
+            restockStmt.run(item.quantity, item.product_id);
+        }
+    });
+
+    cancelTransaction();
+    res.json({ success: true });
 }));
 
 // Tratamento global de erros
