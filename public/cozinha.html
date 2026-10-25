@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cozinha - KDS DUKAFE</title>
+    <style>
+        body { background: #120e0b; color: #f5f0eb; font-family: sans-serif; margin: 0; padding: 20px; }
+        h1 { text-align: center; color: #d4a373; margin-bottom: 30px; }
+        .orders-grid { display: flex; flex-wrap: wrap; gap: 20px; }
+        .order-card { background: #221a15; border: 2px solid #d4a373; border-radius: 12px; width: 300px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .order-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #443831; padding-bottom: 10px; margin-bottom: 15px; }
+        .order-table { font-size: 20px; font-weight: bold; color: #e9d8a6; }
+        .order-time { font-size: 14px; color: #a39183; }
+        ul { padding-left: 20px; margin: 0 0 15px 0; font-size: 18px; }
+        li { margin-bottom: 8px; }
+        .btn-done { background: #588157; color: #fff; border: none; width: 100%; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; }
+        .empty-kds { text-align: center; width: 100%; color: #887568; font-size: 24px; margin-top: 50px; }
+    </style>
+</head>
+<body>
+    <h1>🍳 Painel da Cozinha - KDS DUKAFE</h1>
+    <div id="orders-container" class="orders-grid">
+        <div class="empty-kds">A aguardar novos pedidos... ☕</div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const orders = [];
+
+        socket.on('new-order', (order) => {
+            orders.push(order);
+            renderOrders();
+            playBeep(587.33); // Som para novo pedido
+        });
+
+        function renderOrders() {
+            const container = document.getElementById('orders-container');
+            if (!orders.length) {
+                container.innerHTML = '<div class="empty-kds">A aguardar novos pedidos... ☕</div>';
+                return;
+            }
+
+            container.innerHTML = orders.map((o, idx) => `
+                <div class="order-card">
+                    <div class="order-header">
+                        <span class="order-table">📌 ${o.table_number}</span>
+                        <span class="order-time">Pedido #${o.id}</span>
+                    </div>
+                    <ul>
+                        ${o.items.map(i => `<li><strong>${i.quantity}x</strong> ${i.product_name}</li>`).join('')}
+                    </ul>
+                    <button class="btn-done" onclick="finishOrder(${idx})">PRONTO / AVISAR ATENDENTES ✔</button>
+                </div>
+            `).join('');
+        }
+
+        function finishOrder(idx) {
+            const order = orders[idx];
+            // Envia o aviso para o servidor notificar os telemóveis das garçonetes
+            socket.emit('order-ready', order);
+
+            orders.splice(idx, 1);
+            renderOrders();
+        }
+
+        function playBeep(freq) {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.3);
+            } catch (e) {}
+        }
+    </script>
+</body>
+</html>

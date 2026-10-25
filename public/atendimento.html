@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atendimento - DUKAFE</title>
+    <style>
+        body { background: #1a1512; color: #f5f0eb; font-family: sans-serif; margin: 0; padding: 15px; }
+        h2 { text-align: center; color: #d4a373; }
+        
+        /* Tela de Login PIN */
+        #login-screen { max-width: 320px; margin: 80px auto; background: #2a221d; padding: 25px; border-radius: 12px; border: 1px solid #443831; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.6); }
+        .pin-input { font-size: 28px; letter-spacing: 10px; text-align: center; width: 80%; padding: 10px; border-radius: 8px; border: 1px solid #443831; background: #1a1512; color: #fff; margin-bottom: 20px; }
+        .btn-login { background: #d4a373; color: #1a1512; border: none; width: 100%; padding: 14px; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; }
+
+        /* Painel de Pedidos (Oculto até logar) */
+        #app-screen { display: none; max-width: 600px; margin: 0 auto; padding-bottom: 40px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #d4a373; }
+        input, select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #443831; background: #2a221d; color: #fff; font-size: 16px; box-sizing: border-box; }
+        
+        /* Secção de Pedidos Prontos */
+        .ready-orders-section { background: #221c18; border: 2px solid #588157; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .ready-card { background: #2a221d; padding: 10px 15px; border-radius: 6px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #588157; }
+        .btn-dismiss { background: #588157; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 12px; }
+
+        /* Cardápio e Pesquisa */
+        .search-input { margin-bottom: 10px; }
+        .product-card { background: #2a221d; padding: 12px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #443831; }
+        .btn-add { background: #d4a373; color: #1a1512; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        
+        .cart-list { background: #241d18; padding: 15px; border-radius: 8px; margin-top: 20px; }
+        .btn-send { background: #588157; color: #fff; border: none; width: 100%; padding: 15px; border-radius: 8px; font-size: 18px; font-weight: bold; margin-top: 20px; cursor: pointer; }
+        .user-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #2a221d; padding: 10px 15px; border-radius: 8px; }
+    </style>
+</head>
+<body>
+
+    <!-- TELA DE LOGIN POR PIN -->
+    <div id="login-screen">
+        <h2>☕ DUKAFE Atendimento</h2>
+        <p style="color: #a39183; font-size: 14px; margin-bottom: 20px;">Digite seu PIN de 4 dígitos</p>
+        <input type="password" id="pin-code" maxlength="4" class="pin-input" placeholder="••••" autofocus>
+        <button class="btn-login" onclick="realizarLogin()">ENTRAR</button>
+    </div>
+
+    <!-- APLICAÇÃO DE LANÇAMENTO -->
+    <div id="app-screen">
+        <div class="user-header">
+            <span>👤 <strong id="logged-user"></strong></span>
+            <button onclick="logout()" style="background:none; border:none; color:#e06d6d; cursor:pointer; font-weight:bold;">Sair</button>
+        </div>
+
+        <h2>Lançamento de Mesas</h2>
+        
+        <div class="form-group">
+            <label>Número da Mesa / Cliente:</label>
+            <input type="text" id="table-number" placeholder="Ex: Mesa 04 ou Maria">
+        </div>
+
+        <div class="form-group">
+            <label>👥 Quantidade de Pessoas na Mesa:</label>
+            <input type="number" id="people-count" min="1" value="1" placeholder="Ex: 3">
+        </div>
+
+        <!-- SECÇÃO DE PEDIDOS PRONTOS (Substitui o Pop-up) -->
+        <div id="ready-section" style="display: none;" class="ready-orders-section">
+            <h3 style="margin-top: 0; color: #588157; font-size: 16px;">🔔 Pedidos Prontos para Retirada</h3>
+            <div id="ready-orders-list"></div>
+        </div>
+
+        <h3>Cardápio</h3>
+        <div class="form-group">
+            <input type="text" id="search-product" class="search-input" placeholder="🔍 Pesquisar produto no cardápio..." oninput="filterProducts()">
+        </div>
+        <div id="products-list">A carregar produtos...</div>
+
+        <div class="cart-list">
+            <h3>Pedido Atual</h3>
+            <div id="cart-items">Carrinho vazio.</div>
+            <p style="font-weight: bold; font-size: 18px; margin-top: 10px;">Total: <span id="cart-total">R$ 0,00</span></p>
+            <button class="btn-send" onclick="sendOrder()">ENVIAR PARA A COZINHA 🚀</button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let currentUser = null;
+        let products = [];
+        let cart = [];
+        let readyOrders = [];
+
+        // Ouve o aviso da cozinha e adiciona à lista visual (sem pop-up chato)
+        socket.on('order-ready', (order) => {
+            playAlertTone();
+            readyOrders.push(order);
+            renderReadyOrders();
+        });
+
+        function renderReadyOrders() {
+            const section = document.getElementById('ready-section');
+            const container = document.getElementById('ready-orders-list');
+            
+            if (!readyOrders.length) {
+                section.style.display = 'none';
+                container.innerHTML = '';
+                return;
+            }
+
+            section.style.display = 'block';
+            container.innerHTML = readyOrders.map((o, idx) => `
+                <div class="ready-card">
+                    <div>
+                        <strong>📌 ${o.table_number}</strong><br>
+                        <small style="color: #a39183;">Pedido #${o.id} - Pronto na Cozinha</small>
+                    </div>
+                    <button class="btn-dismiss" onclick="dismissOrder(${idx})">Entregue ✔</button>
+                </div>
+            `).join('');
+        }
+
+        function dismissOrder(idx) {
+            readyOrders.splice(idx, 1);
+            renderReadyOrders();
+        }
+
+        function playAlertTone() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = 880;
+                gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.4);
+            } catch (e) {}
+        }
+
+        async function realizarLogin() {
+            const pin = document.getElementById('pin-code').value.trim();
+            if (pin.length !== 4) {
+                alert('O PIN deve conter 4 dígitos.');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pin })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error);
+
+                currentUser = data.staff;
+                document.getElementById('logged-user').textContent = currentUser.name;
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('app-screen').style.display = 'block';
+                loadProducts();
+            } catch (e) {
+                alert(e.message);
+                document.getElementById('pin-code').value = '';
+            }
+        }
+
+        function logout() {
+            currentUser = null;
+            cart = [];
+            readyOrders = [];
+            renderReadyOrders();
+            document.getElementById('pin-code').value = '';
+            document.getElementById('app-screen').style.display = 'none';
+            document.getElementById('login-screen').style.display = 'block';
+        }
+
+        async function loadProducts() {
+            try {
+                const res = await fetch('/api/products');
+                products = await res.json();
+                renderProducts(products);
+            } catch (e) {
+                alert('Erro ao carregar produtos.');
+            }
+        }
+
+        function filterProducts() {
+            const term = document.getElementById('search-product').value.toLowerCase();
+            const filtered = products.filter(p => p.name.toLowerCase().includes(term) || (p.category_name && p.category_name.toLowerCase().includes(term)));
+            renderProducts(filtered);
+        }
+
+        function renderProducts(list) {
+            const container = document.getElementById('products-list');
+            if (!list.length) {
+                container.innerHTML = '<p style="text-align:center; color:#887568;">Nenhum produto encontrado.</p>';
+                return;
+            }
+            container.innerHTML = list.map(p => `
+                <div class="product-card">
+                    <div>
+                        <strong>${p.name}</strong><br>
+                        <small style="color: #d4a373;">R$ ${p.sale_price.toFixed(2)} (Stock: ${p.stock})</small>
+                    </div>
+                    <button class="btn-add" onclick="addToCart(${p.id})">+ Adicionar</button>
+                </div>
+            `).join('');
+        }
+
+        function addToCart(id) {
+            const prod = products.find(p => p.id === id);
+            const item = cart.find(i => i.product_id === id);
+            const currentQtyInCart = item ? item.quantity : 0;
+
+            if (prod.stock <= currentQtyInCart) {
+                alert(`Stock insuficiente! Apenas ${prod.stock} unidades disponíveis.`);
+                return;
+            }
+
+            if (item) {
+                item.quantity++;
+            } else {
+                cart.push({ product_id: prod.id, name: prod.name, sale_price: prod.sale_price, quantity: 1 });
+            }
+            renderCart();
+        }
+
+        function renderCart() {
+            const container = document.getElementById('cart-items');
+            if (!cart.length) {
+                container.innerHTML = 'Carrinho vazio.';
+                document.getElementById('cart-total').textContent = 'R$ 0,00';
+                return;
+            }
+            let total = 0;
+            container.innerHTML = cart.map((i, idx) => {
+                total += i.sale_price * i.quantity;
+                return `<div style="display:flex; justify-content:space-between; margin-bottom:5px; align-items:center;">
+                    <span>${i.name} (x${i.quantity})</span>
+                    <span>R$ ${(i.sale_price * i.quantity).toFixed(2)}</span>
+                    <button onclick="removeItem(${idx})" style="background:none; border:none; color:#e06d6d; cursor:pointer; font-size:16px;">❌</button>
+                </div>`;
+            }).join('');
+            document.getElementById('cart-total').textContent = `R$ ${total.toFixed(2)}`;
+        }
+
+        function removeItem(idx) {
+            cart.splice(idx, 1);
+            renderCart();
+        }
+
+        async function sendOrder() {
+            const table = document.getElementById('table-number').value.trim();
+            const people = document.getElementById('people-count').value.trim() || '1';
+            
+            if (!table) return alert('Informe o número da mesa ou nome do cliente.');
+            if (!cart.length) return alert('O carrinho está vazio.');
+
+            const tableFormatted = `${table} (${people} ${people === '1' ? 'pessoa' : 'pessoas'}) - Atend.: ${currentUser.name}`;
+
+            try {
+                const res = await fetch('/api/orders', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        table_number: tableFormatted,
+                        items: cart.map(i => ({ product_id: i.product_id, quantity: i.quantity }))
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error);
+
+                alert('Pedido enviado para a cozinha com sucesso! ☕');
+                cart = [];
+                document.getElementById('table-number').value = '';
+                document.getElementById('people-count').value = '1';
+                renderCart();
+                loadProducts(); // Atualiza o stock visualmente
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+
+        document.getElementById('pin-code').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') realizarLogin();
+        });
+    </script>
+</body>
+</html>

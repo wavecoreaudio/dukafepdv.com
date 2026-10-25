@@ -1,8 +1,13 @@
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const path = require('path');
 const db = require('./database');
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
@@ -19,11 +24,26 @@ const wrap = (fn) => (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);
 };
 
-const PAYMENT_METHODS = ['dinheiro', 'cartao_credito', 'cartao_debito', 'pix'];
-
 const getActiveSession = () => {
     return db.prepare("SELECT * FROM cash_sessions WHERE status = 'open' ORDER BY opened_at DESC LIMIT 1").get();
 };
+
+// --------- Autenticação por PIN ---------
+const STAFF_MEMBERS = [
+    { name: 'Funcionária 1', pin: '1080', role: 'garçonete' },
+    { name: 'Funcionária 2', pin: '2080', role: 'garçonete' },
+    { name: 'Funcionária 3 (Extra)', pin: '3080', role: 'garçonete' },
+    { name: 'Gerência (Lucas)', pin: '1848', role: 'admin' }
+];
+
+app.post('/api/auth/login', wrap((req, res) => {
+    const { pin } = req.body;
+    const staff = STAFF_MEMBERS.find(s => s.pin === pin);
+    if (!staff) {
+        throw new AppError('PIN inválido. Tente novamente.', 401);
+    }
+    res.json({ success: true, staff: { name: staff.name, role: staff.role } });
+}));
 
 // --------- Produtos ---------
 app.get('/api/products', wrap((req, res) => {
@@ -211,7 +231,6 @@ app.get('/api/cash/summary', wrap((req, res) => {
     });
 }));
 
-// Rota para histórico de sessões de caixa
 app.get('/api/cash/sessions', wrap((req, res) => {
     const sessions = db.prepare(`
         SELECT cs.*, 
@@ -317,7 +336,7 @@ app.post('/api/cash/movement', wrap((req, res) => {
     res.status(201).json({ success: true });
 }));
 
-// --------- Vendas ---------
+// --------- Vendas / Pedidos para Cozinha ---------
 const createSaleTransaction = db.transaction((body) => {
     const session = getActiveSession();
     if (!session) throw new AppError('O caixa está fechado. Abra o caixa antes de realizar vendas.');
@@ -325,8 +344,7 @@ const createSaleTransaction = db.transaction((body) => {
     const items = Array.isArray(body.items) ? body.items : [];
     if (!items.length) throw new AppError('O carrinho está vazio.');
     
-    const method = String(body.payment_method || '').toLowerCase();
-    if (!PAYMENT_METHODS.includes(method)) throw new AppError('Selecione uma forma de pagamento válida.');
+    const method = String(body.payment_method || 'pendente').toLowerCase();
 
     let total = 0;
     const resolvedItems = [];
@@ -344,12 +362,13 @@ const createSaleTransaction = db.transaction((body) => {
         const total_price = unit_price * qty;
         total += total_price;
 
-        resolvedItems.push({ product_id: product.id, quantity: qty, unit_price, total_price });
+        resolvedItems.push({ product_id: product.id, quantity: qty, unit_price, total_price, product_name: product.name });
     }
 
     const discount = parseFloat(body.discount) || 0;
     const final_amount = Math.max(0, total - discount);
     const created_at = new Date().toISOString();
+    const table_number = body.table_number || 'Balcão';
 
     const saleInfo = db.prepare(`
         INSERT INTO sales (total, discount, final_amount, payment_method, cash_session_id, created_at)
@@ -368,8 +387,20 @@ const createSaleTransaction = db.transaction((body) => {
         updateStockStmt.run(ri.quantity, ri.product_id);
     }
 
-    return db.prepare('SELECT * FROM sales WHERE id = ?').get(saleId);
+    return {
+        id: saleId,
+        table_number,
+        items: resolvedItems,
+        created_at,
+        status: 'active'
+    };
 });
+
+app.post('/api/orders', wrap((req, res) => {
+    const order = createSaleTransaction(req.body);
+    io.emit('new-order', order);
+    res.status(201).json(order);
+}));
 
 app.post('/api/sales', wrap((req, res) => {
     const sale = createSaleTransaction(req.body);
@@ -414,12 +445,20 @@ app.post('/api/sales/:id/cancel', wrap((req, res) => {
     res.json({ success: true });
 }));
 
+// --------- Socket.io Comunicação em Tempo Real ---------
+io.on('connection', (socket) => {
+    // Quando a cozinha clica em pronto, retransmite o aviso para os telemóveis das garçonetes
+    socket.on('order-ready', (order) => {
+        io.emit('order-ready', order);
+    });
+});
+
 // Tratamento global de erros
 app.use((err, req, res, next) => {
     const statusCode = err.statusCode || 500;
     res.status(statusCode).json({ error: err.message || 'Erro interno no servidor.' });
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`DUKAFE PDV rodando em http://localhost:${PORT}`);
 });
