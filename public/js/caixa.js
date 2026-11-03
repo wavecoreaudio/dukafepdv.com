@@ -1,5 +1,3 @@
-renderSidebar('caixa');
-
 const $ = (id) => document.getElementById(id);
 let summary = null;
 
@@ -39,6 +37,8 @@ function render() {
   $('s-sangrias').textContent = formatMoney(s.sangrias);
   $('s-suprimentos').textContent = formatMoney(s.suprimentos);
   $('s-expected').textContent = formatMoney(s.expected_cash);
+  $('pending-box').classList.toggle('hidden', !s.pending_count);
+  $('pending-text').textContent = `${s.pending_count} comanda(s) de mesa ainda não paga(s): ${formatMoney(s.pending_total)}`;
 
   $('movements').innerHTML = s.movements.length ? s.movements.map((m) => {
     const [label, cls] = TYPE_LABELS[m.type] || [m.type, 'badge-ok'];
@@ -46,7 +46,7 @@ function render() {
     return `<tr>
       <td>${formatTime(m.created_at)}</td>
       <td><span class="badge ${cls}">${label}</span></td>
-      <td class="opacity-85">${escapeHtml(m.description || '')}</td>
+      <td class="opacity-85">${escapeHtml(m.description || '')}${m.staff_name ? ` <span class="text-xs opacity-60">• ${escapeHtml(m.staff_name)}</span>` : ''}</td>
       <td style="text-align:right" class="font-bold">${sign}${formatMoney(m.amount)}</td>
     </tr>`;
   }).join('') : '<tr><td colspan="4"><div class="empty-state">Nenhuma movimentação.</div></td></tr>';
@@ -105,6 +105,10 @@ $('btn-close').addEventListener('click', async () => {
   await load();
   if (!summary || !summary.session) return;
   const s = summary;
+  if (s.pending_count) {
+    toast(`Há ${s.pending_count} comanda(s) sem pagamento. Cobre no PDV (botão Comandas) ou cancele no Histórico antes de fechar.`, 'warning', 6000);
+    return;
+  }
   $('f-opening').textContent = formatMoney(s.session.opening_balance);
   $('f-cash').textContent = formatMoney(s.sales_by_method.dinheiro);
   $('f-sup').textContent = formatMoney(s.suprimentos);
@@ -123,14 +127,15 @@ $('f-counted').addEventListener('input', updateDiff);
 $('close-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const raw = $('f-counted').value.trim();
-  const counted = raw ? parseMoney(raw) : null;
-  if (counted !== null && (Number.isNaN(counted) || counted < 0)) return toast('Valor contado inválido.', 'warning');
+  if (!raw) return toast('Conte o dinheiro da gaveta e informe o valor (pode ser 0).', 'warning');
+  const counted = parseMoney(raw);
+  if (Number.isNaN(counted) || counted < 0) return toast('Valor contado inválido.', 'warning');
   if (!confirm('Confirmar o fechamento do caixa? Esta ação não pode ser desfeita.')) return;
   await withLoading($('btn-confirm-close'), async () => {
     try {
       const r = await api('/api/cash/close', { method: 'POST', body: { counted_amount: counted } });
       closeModal('modal-close');
-      const diffMsg = r.difference === null ? '' : ` Diferença: ${formatMoney(r.difference)}.`;
+      const diffMsg = ` Diferença: ${formatMoney(r.difference)}.`;
       toast(`Caixa fechado. Total vendido: ${formatMoney(r.total_sales)}.${diffMsg}`, 'success', 6000);
       $('opening').value = '';
       await load();
@@ -142,4 +147,4 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') document.querySelectorAll('.modal-backdrop.open').forEach((m) => m.classList.remove('open'));
 });
 
-load();
+startAdminPage('caixa', load);

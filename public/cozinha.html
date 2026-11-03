@@ -1,83 +1,234 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cozinha - KDS DUKAFE</title>
-    <style>
-        body { background: #120e0b; color: #f5f0eb; font-family: sans-serif; margin: 0; padding: 20px; }
-        h1 { text-align: center; color: #d4a373; margin-bottom: 30px; }
-        .orders-grid { display: flex; flex-wrap: wrap; gap: 20px; }
-        .order-card { background: #221a15; border: 2px solid #d4a373; border-radius: 12px; width: 300px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-        .order-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #443831; padding-bottom: 10px; margin-bottom: 15px; }
-        .order-table { font-size: 20px; font-weight: bold; color: #e9d8a6; }
-        .order-time { font-size: 14px; color: #a39183; }
-        ul { padding-left: 20px; margin: 0 0 15px 0; font-size: 18px; }
-        li { margin-bottom: 8px; }
-        .btn-done { background: #588157; color: #fff; border: none; width: 100%; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; }
-        .empty-kds { text-align: center; width: 100%; color: #887568; font-size: 24px; margin-top: 50px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cozinha - DUKAFE</title>
+  <style>
+    :root { --bg:#120e0b; --card:#221a15; --line:#443831; --text:#f5f0eb; --muted:#a39183; --accent:#d4a373; --ok:#6bbf59; --warn:#f0a04b; --bad:#e05d4b; }
+    * { box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; margin: 0; padding: 16px; }
+    button { font: inherit; cursor: pointer; touch-action: manipulation; }
+    .hidden { display: none !important; }
+    header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+    h1 { margin: 0; font-size: 24px; color: var(--accent); }
+    .meta { display: flex; align-items: center; gap: 14px; color: var(--muted); font-size: 15px; }
+    .meta strong { color: var(--text); font-size: 20px; }
+    .chip { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--text); font-size: 14px; }
+    .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--bad); margin-right: 6px; }
+    .dot.on { background: var(--ok); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; align-items: start; }
+    .card { background: var(--card); border: 2px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .card.preparando { border-color: var(--accent); }
+    .card.late { border-color: var(--warn); }
+    .card.very-late { border-color: var(--bad); box-shadow: 0 0 0 3px rgba(224,93,75,.25); }
+    .card.flash { animation: flash 1s 3; }
+    @keyframes flash { 50% { background: #3a2a1e; } }
+    .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+    .table { font-size: 22px; font-weight: 800; color: #e9d8a6; word-break: break-word; }
+    .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+    .timer { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .late .timer { color: var(--warn); } .very-late .timer { color: var(--bad); }
+    ul { list-style: none; padding: 0; margin: 0; font-size: 19px; }
+    li { padding: 6px 0; border-bottom: 1px dashed rgba(245,240,235,.08); }
+    li:last-child { border-bottom: none; }
+    .q { display: inline-block; min-width: 38px; font-weight: 800; color: var(--accent); }
+    .note { display: block; margin: 4px 0 0 38px; background: rgba(240,160,75,.18); color: #ffd39a; border-radius: 6px; padding: 3px 8px; font-size: 15px; font-weight: 700; }
+    .status { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+    .status.novo { color: var(--warn); } .status.preparando { color: var(--accent); }
+    .actions { display: flex; gap: 8px; }
+    .btn { flex: 1; border: none; border-radius: 10px; padding: 14px; font-size: 16px; font-weight: 800; }
+    .btn-start { background: var(--accent); color: #1a1512; }
+    .btn-done { background: var(--ok); color: #10240c; }
+    .btn-small { flex: 0 0 auto; background: transparent; color: var(--muted); border: 1px solid var(--line); font-size: 13px; padding: 10px; }
+    .empty { text-align: center; color: #887568; font-size: 22px; margin-top: 60px; grid-column: 1 / -1; }
+    .ready-bar { margin-top: 22px; }
+    .ready-bar h2 { font-size: 15px; color: var(--ok); text-transform: uppercase; letter-spacing: .05em; margin: 0 0 8px; }
+    .ready-items { display: flex; flex-wrap: wrap; gap: 8px; }
+    .ready-item { background: rgba(107,191,89,.12); border: 1px solid rgba(107,191,89,.5); border-radius: 10px; padding: 8px 12px; display: flex; align-items: center; gap: 10px; }
+    #sound-overlay { position: fixed; inset: 0; background: rgba(18,14,11,.92); display: flex; align-items: center; justify-content: center; z-index: 100; }
+    #sound-overlay button { background: var(--accent); color: #1a1512; border: none; border-radius: 14px; padding: 22px 30px; font-size: 22px; font-weight: 800; }
+    #toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: #2a221d; border: 1px solid var(--bad); padding: 12px 18px; border-radius: 12px; font-weight: 600; z-index: 50; }
+  </style>
 </head>
 <body>
-    <h1>🍳 Painel da Cozinha - KDS DUKAFE</h1>
-    <div id="orders-container" class="orders-grid">
-        <div class="empty-kds">A aguardar novos pedidos... ☕</div>
+  <header class="hidden" id="header">
+    <h1>🍳 Cozinha DUKAFE</h1>
+    <div class="meta">
+      <span><strong id="count">0</strong> na fila</span>
+      <span id="clock"></span>
+      <span><span class="dot" id="conn"></span><span id="conn-text">Conectando...</span></span>
+      <label class="chip" style="cursor:pointer"><input type="checkbox" id="auto-print"> 🖨️ Imprimir novos</label>
+      <button class="chip" id="btn-logout"></button>
     </div>
+  </header>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io();
-        const orders = [];
+  <div class="grid" id="orders"></div>
 
-        socket.on('new-order', (order) => {
-            orders.push(order);
-            renderOrders();
-            playBeep(587.33); // Som para novo pedido
-        });
+  <div class="ready-bar hidden" id="ready-bar">
+    <h2>✔ Prontos aguardando atendente</h2>
+    <div class="ready-items" id="ready-items"></div>
+  </div>
 
-        function renderOrders() {
-            const container = document.getElementById('orders-container');
-            if (!orders.length) {
-                container.innerHTML = '<div class="empty-kds">A aguardar novos pedidos... ☕</div>';
-                return;
-            }
+  <div id="sound-overlay" class="hidden"><button id="btn-sound">🔔 Toque aqui para ativar o som</button></div>
+  <div id="toast" class="hidden"></div>
 
-            container.innerHTML = orders.map((o, idx) => `
-                <div class="order-card">
-                    <div class="order-header">
-                        <span class="order-table">📌 ${o.table_number}</span>
-                        <span class="order-time">Pedido #${o.id}</span>
-                    </div>
-                    <ul>
-                        ${o.items.map(i => `<li><strong>${i.quantity}x</strong> ${i.product_name}</li>`).join('')}
-                    </ul>
-                    <button class="btn-done" onclick="finishOrder(${idx})">PRONTO / AVISAR ATENDENTES ✔</button>
-                </div>
-            `).join('');
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/session.js"></script>
+  <script src="/js/print.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const pad = (n) => String(n).padStart(2, '0');
+    let orders = [];
+    let flashIds = new Set();
+    const LATE_MIN = 10, VERY_LATE_MIN = 20;
+
+    function toast(msg) {
+      const t = $('toast'); t.textContent = msg; t.classList.remove('hidden');
+      clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add('hidden'), 4000);
+    }
+
+    async function api(url, opts = {}) {
+      const o = { ...opts, headers: { 'Content-Type': 'application/json' } };
+      if (o.body) o.body = JSON.stringify(o.body);
+      const res = await Session.fetch(url, o);
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error((data && data.error) || 'Erro');
+      return data;
+    }
+
+    // ---------- Som e tela sempre acesa ----------
+    let audioCtx = null;
+    function beep(times = 2) {
+      try {
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        for (let i = 0; i < times; i++) {
+          const t = audioCtx.currentTime + i * 0.3;
+          const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+          o.connect(g); g.connect(audioCtx.destination);
+          o.frequency.value = 660; g.gain.setValueAtTime(0.25, t);
+          o.start(t); o.stop(t + 0.2);
         }
+      } catch (e) { /* sem áudio */ }
+    }
+    function enableSound() {
+      try {
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        audioCtx.resume();
+      } catch (e) { /* ok */ }
+      $('sound-overlay').classList.add('hidden');
+      beep(1);
+      keepAwake();
+    }
+    let wakeLock = null;
+    async function keepAwake() {
+      try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { /* não suportado */ }
+    }
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
 
-        function finishOrder(idx) {
-            const order = orders[idx];
-            // Envia o aviso para o servidor notificar os telemóveis das garçonetes
-            socket.emit('order-ready', order);
+    // ---------- Render ----------
+    function minutesSince(iso) { return Math.floor((Date.now() - new Date(iso).getTime()) / 60000); }
+    function timerText(iso) {
+      const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+      return `${pad(Math.floor(s / 60))}:${pad(s % 60)}`;
+    }
 
-            orders.splice(idx, 1);
-            renderOrders();
+    function render() {
+      const queue = orders.filter((o) => ['novo', 'preparando'].includes(o.kitchen_status));
+      const ready = orders.filter((o) => o.kitchen_status === 'pronto');
+      $('count').textContent = queue.length;
+      document.title = queue.length ? `(${queue.length}) Cozinha - DUKAFE` : 'Cozinha - DUKAFE';
+
+      $('orders').innerHTML = queue.length ? queue.map((o) => {
+        const m = minutesSince(o.created_at);
+        const cls = [o.kitchen_status, m >= VERY_LATE_MIN ? 'very-late' : m >= LATE_MIN ? 'late' : '', flashIds.has(o.id) ? 'flash' : ''].join(' ');
+        return `<div class="card ${cls}">
+          <div class="head">
+            <div>
+              <div class="table">📌 ${esc(o.table_label)}</div>
+              <div class="sub">#${o.id} • ${esc(o.staff_name || '')}${o.people ? ` • ${o.people} pessoa(s)` : ''}</div>
+            </div>
+            <div style="text-align:right">
+              <div class="timer" data-since="${esc(o.created_at)}">${timerText(o.created_at)}</div>
+              <div class="status ${o.kitchen_status}">${o.kitchen_status === 'novo' ? 'Novo' : 'Preparando'}</div>
+              <button class="chip" style="margin-top:6px" data-print="${o.id}" title="Imprimir ticket">🖨️</button>
+            </div>
+          </div>
+          <ul>${o.items.map((i) => `<li><span class="q">${i.quantity}×</span>${esc(i.product_name)}${i.notes ? `<span class="note">📝 ${esc(i.notes)}</span>` : ''}</li>`).join('')}</ul>
+          <div class="actions">
+            ${o.kitchen_status === 'novo'
+              ? `<button class="btn btn-start" data-id="${o.id}" data-to="preparando">COMEÇAR</button><button class="btn btn-done" data-id="${o.id}" data-to="pronto">PRONTO ✔</button>`
+              : `<button class="btn btn-small" data-id="${o.id}" data-to="novo">↩</button><button class="btn btn-done" data-id="${o.id}" data-to="pronto">PRONTO / AVISAR ✔</button>`}
+          </div>
+        </div>`;
+      }).join('') : '<div class="empty">Aguardando novos pedidos... ☕</div>';
+
+      $('ready-bar').classList.toggle('hidden', !ready.length);
+      $('ready-items').innerHTML = ready.map((o) => `
+        <div class="ready-item"><strong>${esc(o.table_label)}</strong><span class="sub">#${o.id}</span>
+          <button class="chip" data-id="${o.id}" data-to="preparando" title="Voltar para preparo">Desfazer</button></div>`).join('');
+    }
+
+    async function load() {
+      orders = await api('/api/kitchen/orders');
+      render();
+    }
+
+    document.addEventListener('click', async (e) => {
+      const pr = e.target.closest('button[data-print]');
+      if (pr) { const o = orders.find((x) => x.id === Number(pr.dataset.print)); if (o) Print.kitchen(o); return; }
+      const b = e.target.closest('button[data-id]');
+      if (!b) return;
+      b.disabled = true;
+      try {
+        const updated = await api(`/api/orders/${b.dataset.id}/status`, { method: 'POST', body: { status: b.dataset.to } });
+        orders = orders.map((o) => (o.id === updated.id ? updated : o));
+        render();
+      } catch (err) {
+        toast(err.message);
+        load().catch(() => {});
+      }
+    });
+
+    setInterval(() => {
+      document.querySelectorAll('.timer[data-since]').forEach((el) => { el.textContent = timerText(el.dataset.since); });
+      const d = new Date(); $('clock').textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }, 1000);
+    // Re-renderiza a cada 30s para atualizar as cores de atraso
+    setInterval(() => render(), 30000);
+
+    (async () => {
+      const me = await Session.ensure();
+      $('header').classList.remove('hidden');
+      $('btn-logout').textContent = `👤 ${me.name} • Sair`;
+      $('btn-logout').addEventListener('click', () => { if (confirm('Sair da tela da cozinha?')) Session.logout(); });
+      $('sound-overlay').classList.remove('hidden');
+      try { $('auto-print').checked = localStorage.getItem('dukafe_autoprint') === '1'; } catch (e) { /* ok */ }
+      $('auto-print').addEventListener('change', () => { try { localStorage.setItem('dukafe_autoprint', $('auto-print').checked ? '1' : '0'); } catch (e) { /* ok */ } });
+      $('btn-sound').addEventListener('click', enableSound);
+      try { await load(); } catch (e) { toast(e.message); }
+
+      const socket = Session.socket();
+      const setConn = (on) => { $('conn').classList.toggle('on', on); $('conn-text').textContent = on ? 'Online' : 'Sem conexão'; };
+      socket.on('connect', () => { setConn(true); load().catch(() => {}); });
+      socket.on('disconnect', () => setConn(false));
+      socket.on('order:new', (o) => {
+        if (!orders.some((x) => x.id === o.id)) orders.push(o);
+        flashIds.add(o.id); setTimeout(() => flashIds.delete(o.id), 3500);
+        render(); beep(2);
+        if ($('auto-print').checked) Print.kitchen(o);
+      });
+      socket.on('order:update', (o) => {
+        if (['novo', 'preparando', 'pronto'].includes(o.kitchen_status) && o.status !== 'cancelled') {
+          orders = orders.some((x) => x.id === o.id) ? orders.map((x) => (x.id === o.id ? o : x)) : [...orders, o];
+        } else {
+          if (o.kitchen_status === 'cancelado' && orders.some((x) => x.id === o.id)) toast(`Pedido #${o.id} (${o.table_label}) foi CANCELADO.`);
+          orders = orders.filter((x) => x.id !== o.id);
         }
-
-        function playBeep(freq) {
-            try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.frequency.value = freq;
-                gain.gain.setValueAtTime(0.1, ctx.currentTime);
-                osc.start();
-                osc.stop(ctx.currentTime + 0.3);
-            } catch (e) {}
-        }
-    </script>
+        render();
+      });
+    })();
+  </script>
 </body>
 </html>

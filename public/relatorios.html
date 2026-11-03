@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relatórios - DUKAFE</title>
+  <script src="/vendor/tailwind.js"></script>
+  <script src="/js/tailwind-config.js"></script>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .bars { display: flex; align-items: flex-end; gap: 2px; height: 180px; padding-top: 8px; border-bottom: 1px solid rgba(245,230,211,.15); }
+    .bar-col { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; min-width: 0; position: relative; cursor: default; }
+    .bar-col:hover .bar { filter: brightness(1.15); }
+    .bar-col:hover { background: rgba(245,230,211,.04); }
+    .bar { width: 100%; max-width: 38px; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 0; }
+    .bar-labels { display: flex; gap: 2px; margin-top: 6px; }
+    .bar-labels span { flex: 1; text-align: center; font-size: 11px; opacity: .6; min-width: 0; overflow: hidden; white-space: nowrap; }
+    .hbar-row { display: grid; grid-template-columns: 110px 1fr 120px; align-items: center; gap: 12px; padding: 6px 0; }
+    .hbar-track { height: 14px; }
+    .hbar { height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; min-width: 2px; }
+    #tip { position: fixed; pointer-events: none; z-index: 60; background: #1d130e; border: 1px solid rgba(245,230,211,.2); border-radius: 8px; padding: 8px 10px; font-size: 13px; box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    @media print {
+      .sidebar, #filters, .no-print { display: none !important; }
+      body, .app-main { background: #fff !important; color: #000 !important; }
+      .card, .stat-card { border-color: #ccc !important; background: #fff !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <main class="app-main p-6">
+      <header class="flex flex-wrap items-end justify-between gap-4 mb-5">
+        <div>
+          <h1 class="text-3xl font-extrabold">📊 Relatórios</h1>
+          <p class="opacity-70 text-sm mt-1" id="period-label">Vendas pagas no período.</p>
+        </div>
+        <div class="flex gap-2 no-print">
+          <button id="btn-csv" class="btn btn-ghost">⬇️ Exportar CSV</button>
+          <button id="btn-print" class="btn btn-ghost">🖨️ Imprimir</button>
+        </div>
+      </header>
+
+      <section id="filters" class="card p-4 mb-6 flex flex-wrap items-end gap-3">
+        <div class="flex gap-2 flex-wrap" id="quick">
+          <button class="pill" data-range="today">Hoje</button>
+          <button class="pill" data-range="yesterday">Ontem</button>
+          <button class="pill" data-range="7">7 dias</button>
+          <button class="pill" data-range="30">30 dias</button>
+          <button class="pill" data-range="month">Este mês</button>
+          <button class="pill" data-range="lastmonth">Mês passado</button>
+        </div>
+        <div class="flex items-end gap-2 ml-auto">
+          <div><label class="label" for="from">De</label><input id="from" type="date" class="input" style="color-scheme:dark"></div>
+          <div><label class="label" for="to">Até</label><input id="to" type="date" class="input" style="color-scheme:dark"></div>
+        </div>
+      </section>
+
+      <section class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <div class="stat-card highlight"><div class="stat-label">Faturamento</div><div id="k-revenue" class="stat-value"></div><div id="k-revenue-sub" class="stat-sub"></div></div>
+        <div class="stat-card"><div class="stat-label">Ticket médio</div><div id="k-ticket" class="stat-value"></div><div id="k-count" class="stat-sub"></div></div>
+        <div class="stat-card"><div class="stat-label">Lucro bruto</div><div id="k-profit" class="stat-value"></div><div id="k-profit-sub" class="stat-sub"></div></div>
+        <div class="stat-card"><div class="stat-label">Custo dos produtos (CMV)</div><div id="k-cost" class="stat-value"></div><div class="stat-sub">pelo custo cadastrado</div></div>
+      </section>
+      <section class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="stat-card"><div class="stat-label">Descontos</div><div id="k-disc" class="stat-value"></div></div>
+        <div class="stat-card"><div class="stat-label">Canceladas</div><div id="k-cancel" class="stat-value"></div><div id="k-cancel-sub" class="stat-sub"></div></div>
+        <div class="stat-card"><div class="stat-label">A receber (comandas)</div><div id="k-pending" class="stat-value"></div><div id="k-pending-sub" class="stat-sub"></div></div>
+        <div class="stat-card"><div class="stat-label">Perdas de estoque</div><div id="k-loss" class="stat-value"></div><div id="k-loss-sub" class="stat-sub"></div></div>
+      </section>
+
+      <section class="grid lg:grid-cols-2 gap-4 mb-6">
+        <div class="card p-5">
+          <h2 class="font-bold mb-1" id="chart-day-title">Faturamento por dia</h2>
+          <div class="text-xs opacity-60 mb-2">Passe o mouse nas barras para ver os valores.</div>
+          <div id="chart-day"></div>
+        </div>
+        <div class="card p-5">
+          <h2 class="font-bold mb-1">Movimento por horário</h2>
+          <div class="text-xs opacity-60 mb-2">Faturamento somado em cada hora do dia (horário de pico).</div>
+          <div id="chart-hour"></div>
+        </div>
+      </section>
+
+      <section class="grid lg:grid-cols-2 gap-4 mb-6">
+        <div class="card p-5">
+          <h2 class="font-bold mb-3">Por forma de pagamento</h2>
+          <div id="methods"></div>
+        </div>
+        <div class="card p-5">
+          <h2 class="font-bold mb-3">Por quem lançou</h2>
+          <table class="table">
+            <thead><tr><th>Pessoa</th><th class="num">Mesa</th><th class="num">Balcão</th><th class="num">Faturamento</th></tr></thead>
+            <tbody id="staff"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="card overflow-x-auto mb-6">
+        <div class="p-5 pb-0"><h2 class="font-bold">Produtos vendidos</h2></div>
+        <table class="table">
+          <thead><tr><th>Produto</th><th>Categoria</th><th class="num">Qtd.</th><th class="num">Faturamento</th><th class="num">Custo</th><th class="num">Lucro</th><th class="num">Margem</th></tr></thead>
+          <tbody id="products"></tbody>
+        </table>
+      </div>
+
+      <div class="card overflow-x-auto">
+        <div class="p-5 pb-0"><h2 class="font-bold">Perdas de estoque</h2></div>
+        <table class="table">
+          <thead><tr><th>Data</th><th>Produto</th><th class="num">Qtd.</th><th class="num">Valor (custo)</th><th>Motivo</th><th>Quem</th></tr></thead>
+          <tbody id="losses"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+  <div id="tip" class="hidden"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/session.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/relatorios.js"></script>
+</body>
+</html>

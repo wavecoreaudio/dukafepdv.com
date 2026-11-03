@@ -37,6 +37,7 @@
           <option value="low">Estoque baixo</option>
           <option value="out">Sem estoque</option>
           <option value="ok">Estoque OK</option>
+          <option value="free">Sem controle (feito na hora)</option>
         </select>
       </section>
 
@@ -79,11 +80,17 @@
             <label class="label" for="p-price">Preço de venda (R$) *</label>
             <input id="p-price" class="input" inputmode="decimal" placeholder="0,00">
           </div>
-          <div>
+          <div class="col-span-2">
+            <label class="flex items-center gap-3 card p-3" style="cursor:pointer">
+              <input id="p-track" type="checkbox" checked style="width:20px;height:20px;accent-color:var(--accent)">
+              <span><strong>Controlar estoque</strong><br><span class="text-xs opacity-70">Desmarque para itens feitos na hora (café, sucos, tapiocas). Eles nunca ficam "sem estoque".</span></span>
+            </label>
+          </div>
+          <div class="stock-field">
             <label class="label" for="p-stock" id="p-stock-label">Estoque inicial</label>
             <input id="p-stock" class="input" type="number" min="0" step="1" value="0">
           </div>
-          <div>
+          <div class="stock-field">
             <label class="label" for="p-min">Estoque mínimo</label>
             <input id="p-min" class="input" type="number" min="0" step="1" value="5">
           </div>
@@ -122,6 +129,16 @@
           <button type="button" class="btn btn-ghost btn-sm" data-add="50">+50</button>
         </div>
         <p class="text-sm opacity-75 mt-3">Novo estoque: <strong id="r-new"></strong></p>
+        <div class="grid grid-cols-2 gap-3 mt-4">
+          <div>
+            <label class="label" for="r-reason">Origem / fornecedor</label>
+            <input id="r-reason" class="input" maxlength="120" placeholder="Ex.: Atacadão">
+          </div>
+          <div>
+            <label class="label" for="r-cost">Novo custo (opcional)</label>
+            <input id="r-cost" class="input" inputmode="decimal" placeholder="Mantém o atual">
+          </div>
+        </div>
         <div class="flex justify-end gap-3 mt-6">
           <button type="button" class="btn btn-ghost" data-close-modal>Cancelar</button>
           <button type="submit" id="btn-restock" class="btn btn-success">Confirmar</button>
@@ -130,6 +147,56 @@
     </div>
   </div>
 
+  <!-- Modal ajuste / perda -->
+  <div id="modal-adjust" class="modal-backdrop">
+    <div class="modal" style="max-width:440px">
+      <form id="adjust-form" class="p-6" novalidate>
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-extrabold">Ajustar estoque</h3>
+          <button type="button" class="btn btn-ghost btn-sm" data-close-modal>✕</button>
+        </div>
+        <input type="hidden" id="a-id">
+        <div class="card p-4 mb-4">
+          <div id="a-name" class="font-bold text-lg"></div>
+          <div class="text-sm opacity-75 mt-1">Estoque no sistema: <strong id="a-current"></strong></div>
+        </div>
+        <div class="grid grid-cols-2 gap-2 mb-4">
+          <button type="button" class="pay-btn active" data-mode="perda"><span class="pay-icon">🗑️</span>Perda<span class="pay-key">quebrou, venceu, consumo</span></button>
+          <button type="button" class="pay-btn" data-mode="contagem"><span class="pay-icon">🔢</span>Contagem<span class="pay-key">acertar com o que contou</span></button>
+        </div>
+        <label class="label" for="a-qty" id="a-qty-label">Quantidade perdida</label>
+        <input id="a-qty" class="input text-2xl font-bold" type="number" min="0" step="1" data-autofocus>
+        <p class="text-sm opacity-75 mt-2">Estoque depois: <strong id="a-new">-</strong></p>
+        <label class="label mt-4" for="a-reason">Motivo *</label>
+        <input id="a-reason" class="input" maxlength="120" placeholder="Ex.: venceu, caiu no chão, contagem semanal">
+        <div class="flex justify-end gap-3 mt-6">
+          <button type="button" class="btn btn-ghost" data-close-modal>Cancelar</button>
+          <button type="submit" id="btn-adjust" class="btn btn-warning">Confirmar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal histórico do produto -->
+  <div id="modal-history" class="modal-backdrop">
+    <div class="modal modal-lg">
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-extrabold">Histórico de estoque — <span id="hst-name"></span></h3>
+          <button class="btn btn-ghost btn-sm" data-close-modal>✕</button>
+        </div>
+        <div class="card overflow-auto" style="max-height:60vh">
+          <table class="table">
+            <thead><tr><th>Data</th><th>Tipo</th><th style="text-align:right">Qtd.</th><th style="text-align:right">Saldo</th><th>Motivo</th><th>Quem</th></tr></thead>
+            <tbody id="hst-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/session.js"></script>
   <script src="/js/common.js"></script>
   <script src="/js/estoque.js"></script>
 </body>

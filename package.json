@@ -1,10 +1,11 @@
 {
   "name": "dukafe-pdv",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Sistema PDV e Estoque - DUKAFE Cafeteria",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "equipe": "node scripts/equipe.js"
   },
   "engines": {
     "node": ">=18"

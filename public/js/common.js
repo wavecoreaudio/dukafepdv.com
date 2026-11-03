@@ -55,13 +55,13 @@ function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-/** Requisições à API com mensagens amigáveis */
+/** Requisições à API (com login) e mensagens amigáveis */
 async function api(url, options = {}) {
-  const opts = { headers: { 'Content-Type': 'application/json' }, ...options };
+  const opts = { ...options, headers: { 'Content-Type': 'application/json', ...(options.headers || {}) } };
   if (opts.body && typeof opts.body !== 'string') opts.body = JSON.stringify(opts.body);
   let res;
   try {
-    res = await fetch(url, opts);
+    res = await Session.fetch(url, opts);
   } catch (e) {
     throw new Error('Não foi possível conectar ao sistema. Verifique se o servidor está em execução.');
   }
@@ -136,6 +136,8 @@ function renderSidebar(active) {
     { key: 'estoque', href: '/estoque.html', icon: '📦', label: 'Estoque' },
     { key: 'caixa', href: '/caixa.html', icon: '💰', label: 'Caixa' },
     { key: 'historico', href: '/historico.html', icon: '🧾', label: 'Histórico' },
+    { key: 'relatorios', href: '/relatorios.html', icon: '📊', label: 'Relatórios' },
+    { key: 'cozinha', href: '/cozinha.html', icon: '🍳', label: 'Cozinha' },
   ];
   const aside = document.createElement('aside');
   aside.className = 'sidebar';
@@ -149,8 +151,13 @@ function renderSidebar(active) {
     <div class="sidebar-status" id="sidebar-status">
       <div><span class="status-dot closed"></span></div><div>...</div>
     </div>
-    <div class="sidebar-status" style="margin-top:10px" id="sidebar-clock"></div>`;
+    <div class="sidebar-status" style="margin-top:10px" id="sidebar-clock"></div>
+    <div class="sidebar-status" style="margin-top:10px;cursor:pointer" id="sidebar-user" title="Sair"></div>`;
   document.body.prepend(aside);
+  const staff = Session.staff;
+  const userEl = document.getElementById('sidebar-user');
+  userEl.innerHTML = `<div>👤</div><div>${escapeHtml(staff ? staff.name : '')}<br><u>Sair</u></div>`;
+  userEl.addEventListener('click', () => { if (confirm('Sair do sistema?')) Session.logout(); });
   updateSidebarStatus();
   const clock = () => {
     const d = new Date();
@@ -174,4 +181,14 @@ async function updateSidebarStatus() {
     el.innerHTML = '<div><span class="status-dot closed"></span></div><div>Offline</div>';
     return null;
   }
+}
+
+/**
+ * Início padrão das telas da gerência: exige PIN de admin, monta a barra lateral
+ * e só então chama a função da página.
+ */
+async function startAdminPage(active, main) {
+  await Session.ensure(['admin']);
+  renderSidebar(active);
+  await main();
 }

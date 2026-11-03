@@ -20,7 +20,7 @@
               placeholder="Buscar produto... (F2)" autocomplete="off">
           </div>
           <div class="text-sm opacity-70 hidden xl:block">
-            <span class="kbd">F2</span> busca &nbsp; <span class="kbd">Esc</span> limpar &nbsp; <span class="kbd">F9</span> finalizar
+            <span class="kbd">F2</span> busca &nbsp; <span class="kbd">Esc</span> limpar &nbsp; <span class="kbd">F9</span> finalizar &nbsp; <span class="kbd">F4</span> comandas
           </div>
         </header>
 
@@ -48,7 +48,10 @@
             <div class="relative text-2xl">🛒<span id="cart-badge" class="cart-badge">0</span></div>
             <h2 class="text-lg font-extrabold ml-2">Pedido atual</h2>
           </div>
-          <button id="btn-clear" class="btn btn-ghost btn-sm">Limpar</button>
+          <div class="flex gap-2">
+            <button id="btn-orders" class="btn btn-ghost btn-sm" title="Comandas das mesas (F4)">📋 Comandas <strong id="btn-orders-count">0</strong></button>
+            <button id="btn-clear" class="btn btn-ghost btn-sm">Limpar</button>
+          </div>
         </div>
 
         <div id="cart-items" class="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2"></div>
@@ -71,7 +74,7 @@
     <div class="modal">
       <div id="payment-form" class="p-6">
         <div class="flex justify-between items-center mb-1">
-          <h3 class="text-xl font-extrabold">Pagamento</h3>
+          <h3 id="pay-title" class="text-xl font-extrabold">Pagamento</h3>
           <button class="btn btn-ghost btn-sm" data-close-modal>✕</button>
         </div>
         <p class="text-sm opacity-70 mb-4">Total a pagar</p>
@@ -99,15 +102,33 @@
 
       <div id="payment-success" class="hidden p-8 text-center">
         <div class="success-check"><svg viewBox="0 0 52 52"><path d="M14 27l8 8 16-17"/></svg></div>
-        <h3 class="text-2xl font-extrabold mt-5">Venda concluída!</h3>
+        <h3 id="success-title" class="text-2xl font-extrabold mt-5">Venda concluída!</h3>
         <p id="success-info" class="opacity-80 mt-2"></p>
         <div id="success-change" class="text-4xl font-extrabold mt-3"></div>
-        <button id="btn-new-sale" class="btn btn-primary btn-lg w-full mt-6">NOVA VENDA <span class="kbd">Enter</span></button>
+        <button id="btn-print-receipt" class="btn btn-ghost w-full mt-6">🖨️ IMPRIMIR CUPOM <span class="kbd">P</span></button>
+        <button id="btn-new-sale" class="btn btn-primary btn-lg w-full mt-3">NOVA VENDA <span class="kbd">Enter</span></button>
       </div>
     </div>
   </div>
 
+  <!-- Modal comandas -->
+  <div id="modal-orders" class="modal-backdrop">
+    <div class="modal modal-lg">
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-extrabold">📋 Comandas em aberto</h3>
+          <button class="btn btn-ghost btn-sm" data-close-modal>✕</button>
+        </div>
+        <p class="text-sm opacity-70 mb-4">Pedidos lançados pelas atendentes que ainda não foram pagos. Cada mesa junta todas as suas rodadas.</p>
+        <div id="orders-list" class="flex flex-col gap-3" style="max-height:60vh;overflow-y:auto"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/session.js"></script>
   <script src="/js/common.js"></script>
+  <script src="/js/print.js"></script>
   <script src="/js/pdv.js"></script>
 </body>
 </html>

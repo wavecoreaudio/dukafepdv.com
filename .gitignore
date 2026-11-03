@@ -1,2 +1,5 @@
 node_modules/
 data/
+config/
+_backup_antes_correcoes/
+_backup_v1.1/

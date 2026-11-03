@@ -1,5 +1,3 @@
-renderSidebar('pdv');
-
 const state = {
   products: [],
   categories: [],
@@ -10,18 +8,23 @@ const state = {
   paymentMethod: null,
   sessionOpen: false,
   finished: false,
+  payTarget: null, // null = carrinho; { ids, total, label } = comandas de mesa
+  openOrders: [],
 };
 
 const $ = (id) => document.getElementById(id);
 
 async function loadData() {
   try {
-    const [products, categories, topSellers, session] = await Promise.all([
+    const [products, categories, topSellers, session, openOrders] = await Promise.all([
       api('/api/products'),
       api('/api/categories'),
       api('/api/products/top-sellers?limit=5'),
       updateSidebarStatus(),
+      api('/api/orders/open'),
     ]);
+    state.openOrders = openOrders;
+    renderOrdersButton();
     state.products = products;
     state.categories = categories;
     state.topSellers = topSellers;
@@ -39,7 +42,7 @@ async function loadData() {
 function syncCartWithStock() {
   state.cart.forEach((item) => {
     const p = state.products.find((x) => x.id === item.product_id);
-    if (p) { item.stock = p.stock; item.unit_price = p.sale_price; }
+    if (p) { item.stock = p.track_stock ? p.stock : Infinity; item.unit_price = p.sale_price; }
   });
 }
 
@@ -55,11 +58,12 @@ function inCartQty(id) {
 }
 
 function productCard(p, isTop = false) {
-  const available = p.stock - inCartQty(p.id);
-  const out = p.stock <= 0;
+  const tracked = !!p.track_stock;
+  const available = tracked ? p.stock - inCartQty(p.id) : '∞';
+  const out = tracked && p.stock <= 0;
   let tag = '';
   if (out) tag = '<span class="stock-tag badge-out">SEM ESTOQUE</span>';
-  else if (p.stock <= p.min_stock) tag = `<span class="stock-tag badge-low">${p.stock} un.</span>`;
+  else if (tracked && p.stock <= p.min_stock) tag = `<span class="stock-tag badge-low">${p.stock} un.</span>`;
   const extra = isTop ? `<span class="text-xs opacity-70">${p.total_sold} vendidos</span>` : `<span class="text-xs opacity-60">${escapeHtml(p.category_name || '')}</span>`;
   return `
     <button class="product-card ${isTop ? 'top' : ''} ${out ? 'disabled' : ''}" data-id="${p.id}" ${out ? 'disabled' : ''} title="Disponível: ${available}">
@@ -101,12 +105,12 @@ function addToCart(id) {
   if (!p) return;
   const item = state.cart.find((i) => i.product_id === id);
   const current = item ? item.quantity : 0;
-  if (current + 1 > p.stock) {
+  if (p.track_stock && current + 1 > p.stock) {
     toast(`Estoque insuficiente de "${p.name}" (disponível: ${p.stock}).`, 'warning');
     return;
   }
   if (item) item.quantity += 1;
-  else state.cart.push({ product_id: p.id, name: p.name, unit_price: p.sale_price, quantity: 1, stock: p.stock });
+  else state.cart.push({ product_id: p.id, name: p.name, unit_price: p.sale_price, quantity: 1, stock: p.track_stock ? p.stock : Infinity });
   renderCart(true);
 }
 
@@ -169,8 +173,11 @@ function clearCart() {
 }
 
 // ---------- Pagamento ----------
-function openPayment() {
-  if (!state.cart.length) return;
+const payTotal = () => (state.payTarget ? state.payTarget.total : cartTotal());
+
+function openPayment(target = null) {
+  state.payTarget = target;
+  if (!target && !state.cart.length) return;
   if (!state.sessionOpen) {
     toast('O caixa está fechado. Abra o caixa antes de vender.', 'warning');
     return;
@@ -179,7 +186,8 @@ function openPayment() {
   state.finished = false;
   $('payment-form').classList.remove('hidden');
   $('payment-success').classList.add('hidden');
-  $('pay-total').textContent = formatMoney(cartTotal());
+  $('pay-total').textContent = formatMoney(payTotal());
+  $('pay-title').textContent = target ? `Cobrar ${target.label}` : 'Pagamento';
   $('amount-received').value = '';
   $('cash-fields').classList.add('hidden');
   document.querySelectorAll('.pay-btn').forEach((b) => b.classList.remove('active'));
@@ -190,7 +198,7 @@ function openPayment() {
 }
 
 function renderQuickCash() {
-  const total = cartTotal();
+  const total = payTotal();
   const values = new Set([total]);
   [5, 10, 20, 50, 100, 200].forEach((n) => { if (n >= total) values.add(n); });
   values.add(Math.ceil(total / 10) * 10);
@@ -209,7 +217,7 @@ function selectMethod(method) {
 }
 
 function updatePaymentState() {
-  const total = cartTotal();
+  const total = payTotal();
   let ok = !!state.paymentMethod;
   if (state.paymentMethod === 'dinheiro') {
     const received = parseMoney($('amount-received').value);
@@ -225,23 +233,47 @@ function updatePaymentState() {
 async function confirmPayment() {
   const btn = $('btn-confirm-payment');
   if (btn.disabled || btn.classList.contains('loading')) return;
-  const payload = {
-    items: state.cart.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
-    payment_method: state.paymentMethod,
-  };
-  if (state.paymentMethod === 'dinheiro') payload.amount_paid = parseMoney($('amount-received').value);
+  const target = state.payTarget;
+  const amount_paid = state.paymentMethod === 'dinheiro' ? parseMoney($('amount-received').value) : undefined;
 
   await withLoading(btn, async () => {
     try {
-      const sale = await api('/api/sales', { method: 'POST', body: payload });
+      let info;
+      if (target) {
+        const r = await api('/api/orders/pay', { method: 'POST', body: { ids: target.ids, payment_method: state.paymentMethod, amount_paid } });
+        info = { title: `${target.label} paga`, label: `${target.ids.length} comanda(s)`, total: r.total, method: r.payment_method, change: r.change_given };
+        const orders = state.openOrders.filter((o) => target.ids.includes(o.id));
+        state.lastReceipt = {
+          title: 'CUPOM - MESA', number: `Comanda(s) #${target.ids.join(', #')}`, table: target.label,
+          staff: [...new Set(orders.map((o) => o.staff_name))].join(', '),
+          items: orders.flatMap((o) => o.items.map((i) => ({ quantity: i.quantity, name: i.product_name, unit: i.unit_price, total: i.total_price, notes: i.notes }))),
+          total: r.total, method: r.payment_method, paid: r.amount_paid, change: r.change_given,
+        };
+      } else {
+        const payload = {
+          items: state.cart.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
+          payment_method: state.paymentMethod,
+          amount_paid,
+        };
+        const sale = await api('/api/sales', { method: 'POST', body: payload });
+        info = { title: 'Venda concluída!', label: `Venda #${sale.id}`, total: sale.final_amount, method: sale.payment_method, change: sale.change_given };
+        state.lastReceipt = {
+          title: 'CUPOM', number: `Venda #${sale.id}`, date: sale.created_at,
+          items: sale.items.map((i) => ({ quantity: i.quantity, name: i.product_name, unit: i.unit_price, total: i.total_price, notes: i.notes })),
+          subtotal: sale.total, discount: sale.discount, total: sale.final_amount,
+          method: sale.payment_method, paid: sale.amount_paid, change: sale.change_given,
+        };
+        state.cart = [];
+        renderCart();
+      }
       state.finished = true;
       $('payment-form').classList.add('hidden');
       $('payment-success').classList.remove('hidden');
-      $('success-info').textContent = `Venda #${sale.id} • ${PAYMENT_LABELS[sale.payment_method]} • ${formatMoney(sale.total)}`;
-      $('success-change').textContent = sale.payment_method === 'dinheiro' ? `Troco: ${formatMoney(sale.change_given)}` : '';
-      state.cart = [];
-      renderCart();
-      toast(`Venda #${sale.id} registrada com sucesso!`, 'success');
+      $('success-title').textContent = info.title;
+      $('success-info').textContent = `${info.label} • ${PAYMENT_LABELS[info.method] || info.method} • ${formatMoney(info.total)}`;
+      $('success-change').textContent = info.method === 'dinheiro' ? `Troco: ${formatMoney(info.change)}` : '';
+      toast(`${info.label} registrada com sucesso!`, 'success');
+      state.payTarget = null;
       loadData();
     } catch (e) {
       toast(e.message, 'error');
@@ -250,9 +282,69 @@ async function confirmPayment() {
   });
 }
 
+// ---------- Comandas de mesa (pedidos das atendentes) ----------
+const KITCHEN_LABELS = { novo: '🆕 Na fila', preparando: '🔥 Preparando', pronto: '🔔 Pronto', entregue: '✔ Entregue' };
+
+function groupOrders() {
+  const groups = new Map();
+  for (const o of state.openOrders) {
+    const key = (o.table_label || 'Sem mesa').trim().toLowerCase();
+    if (!groups.has(key)) groups.set(key, { label: o.table_label || 'Sem mesa', orders: [], total: 0 });
+    const g = groups.get(key);
+    g.orders.push(o);
+    g.total = Math.round((g.total + o.final_amount) * 100) / 100;
+  }
+  return [...groups.values()];
+}
+
+function renderOrdersButton() {
+  const n = groupOrders().length;
+  $('btn-orders-count').textContent = n;
+  $('btn-orders').classList.toggle('btn-warning', n > 0);
+  $('btn-orders').classList.toggle('btn-ghost', n === 0);
+}
+
+function renderOrdersModal() {
+  const groups = groupOrders();
+  $('orders-list').innerHTML = groups.length ? groups.map((g, gi) => `
+    <div class="card p-4">
+      <div class="flex justify-between items-start gap-3">
+        <div>
+          <div class="text-lg font-extrabold">📌 ${escapeHtml(g.label)}</div>
+          <div class="text-xs opacity-70">${g.orders.length} pedido(s) • ${escapeHtml([...new Set(g.orders.map((o) => o.staff_name))].join(', '))}</div>
+        </div>
+        <div class="text-right">
+          <div class="text-2xl font-extrabold" style="color:var(--accent)">${formatMoney(g.total)}</div>
+          <div class="flex gap-2 mt-1 justify-end">
+            <button class="btn btn-ghost btn-sm" data-bill-group="${gi}" title="Imprimir conferência da mesa">🧾 Conta</button>
+            <button class="btn btn-success btn-sm" data-pay-group="${gi}">COBRAR</button>
+          </div>
+        </div>
+      </div>
+      ${g.orders.map((o) => `
+        <div class="mt-3 pt-3 text-sm" style="border-top:1px solid rgba(245,230,211,.08)">
+          <div class="flex justify-between opacity-80">
+            <span>#${o.id} • ${formatTime(o.created_at)}${o.people ? ` • ${o.people} pessoa(s)` : ''}</span>
+            <span>${KITCHEN_LABELS[o.kitchen_status] || ''}</span>
+          </div>
+          ${o.items.map((i) => `<div>${i.quantity}× ${escapeHtml(i.product_name)}${i.notes ? ` <em class="opacity-70">(${escapeHtml(i.notes)})</em>` : ''}
+            <span class="float-right">${formatMoney(i.total_price)}</span></div>`).join('')}
+        </div>`).join('')}
+    </div>`).join('')
+    : '<div class="empty-state"><div class="empty-icon">📋</div>Nenhuma comanda em aberto.</div>';
+}
+
+async function openOrders() {
+  try { state.openOrders = await api('/api/orders/open'); } catch (e) { toast(e.message, 'error'); }
+  renderOrdersButton();
+  renderOrdersModal();
+  openModal('modal-orders');
+}
+
 function newSale() {
   closeModal('modal-payment');
   state.finished = false;
+  state.payTarget = null;
   $('search').focus();
 }
 
@@ -275,6 +367,23 @@ document.addEventListener('click', (e) => {
   if (rem) return removeItem(Number(rem.dataset.remove));
   const pay = e.target.closest('.pay-btn');
   if (pay) return selectMethod(pay.dataset.method);
+  const billGroup = e.target.closest('[data-bill-group]');
+  if (billGroup) {
+    const g = groupOrders()[Number(billGroup.dataset.billGroup)];
+    if (g) Print.bill(g);
+    return;
+  }
+  if (e.target.closest('#btn-print-receipt')) {
+    if (state.lastReceipt) Print.receipt(state.lastReceipt);
+    return;
+  }
+  const payGroup = e.target.closest('[data-pay-group]');
+  if (payGroup) {
+    const g = groupOrders()[Number(payGroup.dataset.payGroup)];
+    if (!g) return;
+    closeModal('modal-orders');
+    return openPayment({ ids: g.orders.map((o) => o.id), total: g.total, label: g.label });
+  }
   const quick = e.target.closest('[data-quick]');
   if (quick) {
     $('amount-received').value = Number(quick.dataset.quick).toFixed(2).replace('.', ',');
@@ -290,7 +399,8 @@ $('search').addEventListener('keydown', (e) => {
   }
 });
 $('amount-received').addEventListener('input', updatePaymentState);
-$('btn-checkout').addEventListener('click', openPayment);
+$('btn-checkout').addEventListener('click', () => openPayment());
+$('btn-orders').addEventListener('click', openOrders);
 $('btn-confirm-payment').addEventListener('click', confirmPayment);
 $('btn-new-sale').addEventListener('click', newSale);
 $('btn-clear').addEventListener('click', () => {
@@ -310,13 +420,24 @@ document.addEventListener('keydown', (e) => {
     if (!paymentOpen) openPayment();
     return;
   }
+  if (e.key === 'F4') {
+    e.preventDefault();
+    if (!paymentOpen) openOrders();
+    return;
+  }
   if (e.key === 'Escape') {
-    if (paymentOpen) { closeModal('modal-payment'); return; }
+    if (paymentOpen) { closeModal('modal-payment'); state.payTarget = null; return; }
+    if ($('modal-orders').classList.contains('open')) { closeModal('modal-orders'); return; }
     if (state.search) { $('search').value = ''; state.search = ''; renderProducts(); }
     $('search').blur();
     return;
   }
   if (paymentOpen) {
+    if (state.finished && (e.key === 'p' || e.key === 'P')) {
+      e.preventDefault();
+      if (state.lastReceipt) Print.receipt(state.lastReceipt);
+      return;
+    }
     if (e.key === 'Enter') {
       e.preventDefault();
       if (state.finished) newSale();
@@ -330,4 +451,11 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-loadData();
+startAdminPage('pdv', async () => {
+  await loadData();
+  // Atualiza comandas e estoque em tempo real
+  const socket = Session.socket();
+  const refresh = () => loadData();
+  ['order:new', 'order:update', 'orders:paid', 'stock:changed', 'cash:changed'].forEach((ev) => socket.on(ev, refresh));
+  socket.on('order:new', (o) => toast(`Novo pedido: ${o.table_label}`, 'info'));
+});

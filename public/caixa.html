@@ -40,6 +40,10 @@
           </div>
         </div>
 
+        <div id="pending-box" class="hidden card px-4 py-3 mb-4 flex items-center justify-between" style="border-color:rgba(240,160,75,.5);background:rgba(240,160,75,.12)">
+          <span>📋 <strong id="pending-text"></strong></span>
+          <a href="/index.html" class="btn btn-warning btn-sm">Ir para o PDV</a>
+        </div>
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <div class="stat-card"><div class="stat-label">💵 Dinheiro</div><div id="s-dinheiro" class="stat-value"></div><div id="c-dinheiro" class="stat-sub"></div></div>
           <div class="stat-card"><div class="stat-label">📱 Pix</div><div id="s-pix" class="stat-value"></div><div id="c-pix" class="stat-sub"></div></div>
@@ -47,7 +51,7 @@
           <div class="stat-card"><div class="stat-label">💳 Crédito</div><div id="s-credito" class="stat-value"></div><div id="c-credito" class="stat-sub"></div></div>
         </div>
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div class="stat-card"><div class="stat-label">Total de vendas</div><div id="s-total" class="stat-value"></div><div id="c-total" class="stat-sub"></div></div>
+          <div class="stat-card"><div class="stat-label">Total recebido</div><div id="s-total" class="stat-value"></div><div id="c-total" class="stat-sub"></div></div>
           <div class="stat-card"><div class="stat-label">Sangrias</div><div id="s-sangrias" class="stat-value" style="color:var(--warning)"></div></div>
           <div class="stat-card"><div class="stat-label">Suprimentos</div><div id="s-suprimentos" class="stat-value" style="color:var(--accent)"></div></div>
           <div class="stat-card highlight"><div class="stat-label">Saldo esperado em caixa</div><div id="s-expected" class="stat-value"></div><div class="stat-sub">Fundo + dinheiro + suprimentos − sangrias</div></div>
@@ -111,6 +115,8 @@
     </div>
   </div>
 
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/session.js"></script>
   <script src="/js/common.js"></script>
   <script src="/js/caixa.js"></script>
 </body>

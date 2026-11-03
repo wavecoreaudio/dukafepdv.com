@@ -1,291 +1,326 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Atendimento - DUKAFE</title>
-    <style>
-        body { background: #1a1512; color: #f5f0eb; font-family: sans-serif; margin: 0; padding: 15px; }
-        h2 { text-align: center; color: #d4a373; }
-        
-        /* Tela de Login PIN */
-        #login-screen { max-width: 320px; margin: 80px auto; background: #2a221d; padding: 25px; border-radius: 12px; border: 1px solid #443831; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.6); }
-        .pin-input { font-size: 28px; letter-spacing: 10px; text-align: center; width: 80%; padding: 10px; border-radius: 8px; border: 1px solid #443831; background: #1a1512; color: #fff; margin-bottom: 20px; }
-        .btn-login { background: #d4a373; color: #1a1512; border: none; width: 100%; padding: 14px; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#1a1512">
+  <title>Atendimento - DUKAFE</title>
+  <style>
+    :root { --bg:#1a1512; --card:#2a221d; --line:#443831; --text:#f5f0eb; --muted:#a39183; --accent:#d4a373; --ok:#6bbf59; --warn:#f0a04b; --bad:#e06d6d; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; margin: 0; padding: 12px 12px 120px; }
+    .wrap { max-width: 640px; margin: 0 auto; }
+    button { font: inherit; cursor: pointer; touch-action: manipulation; }
+    input { font: inherit; }
+    .top { display: flex; justify-content: space-between; align-items: center; background: var(--card); padding: 10px 14px; border-radius: 12px; margin-bottom: 12px; }
+    .top .who { font-weight: 700; }
+    .link { background: none; border: none; color: var(--bad); font-weight: 700; padding: 6px; }
+    .warn { background: rgba(240,160,75,.15); border: 1px solid rgba(240,160,75,.5); padding: 10px 12px; border-radius: 10px; margin-bottom: 12px; font-size: 14px; }
+    .hidden { display: none !important; }
+    h3 { margin: 18px 0 8px; font-size: 15px; text-transform: uppercase; letter-spacing: .04em; color: var(--accent); }
+    .row { display: flex; gap: 10px; }
+    .field { flex: 1; }
+    .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
+    .input { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--text); font-size: 16px; }
+    .stepper { display: flex; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+    .stepper button { width: 44px; height: 46px; background: none; border: none; color: var(--accent); font-size: 22px; font-weight: 700; }
+    .stepper span { min-width: 28px; text-align: center; font-weight: 700; }
 
-        /* Painel de Pedidos (Oculto até logar) */
-        #app-screen { display: none; max-width: 600px; margin: 0 auto; padding-bottom: 40px; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; color: #d4a373; }
-        input, select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #443831; background: #2a221d; color: #fff; font-size: 16px; box-sizing: border-box; }
-        
-        /* Secção de Pedidos Prontos */
-        .ready-orders-section { background: #221c18; border: 2px solid #588157; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
-        .ready-card { background: #2a221d; padding: 10px 15px; border-radius: 6px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #588157; }
-        .btn-dismiss { background: #588157; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 12px; }
+    .ready { background: rgba(107,191,89,.1); border: 2px solid var(--ok); border-radius: 12px; padding: 10px; margin-bottom: 8px; }
+    .ready-card { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: var(--card); padding: 10px 12px; border-radius: 10px; margin-top: 8px; border-left: 5px solid var(--ok); }
+    .ready-card.mine { border-left-color: var(--accent); }
+    .ready-card small, .muted { color: var(--muted); font-size: 13px; }
+    .btn { border: none; border-radius: 10px; padding: 10px 14px; font-weight: 700; }
+    .btn-ok { background: var(--ok); color: #10240c; }
+    .btn-accent { background: var(--accent); color: #1a1512; }
+    .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
 
-        /* Cardápio e Pesquisa */
-        .search-input { margin-bottom: 10px; }
-        .product-card { background: #2a221d; padding: 12px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #443831; }
-        .btn-add { background: #d4a373; color: #1a1512; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; }
-        
-        .cart-list { background: #241d18; padding: 15px; border-radius: 8px; margin-top: 20px; }
-        .btn-send { background: #588157; color: #fff; border: none; width: 100%; padding: 15px; border-radius: 8px; font-size: 18px; font-weight: bold; margin-top: 20px; cursor: pointer; }
-        .user-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #2a221d; padding: 10px 15px; border-radius: 8px; }
-    </style>
+    .pills { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; }
+    .pill { flex: 0 0 auto; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--text); font-size: 14px; }
+    .pill.active { background: var(--accent); color: #1a1512; border-color: var(--accent); font-weight: 700; }
+    .product { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: var(--card); padding: 12px; border-radius: 10px; margin-top: 8px; border: 1px solid var(--line); }
+    .product.out { opacity: .45; }
+    .product .price { color: var(--accent); font-weight: 700; font-size: 14px; }
+    .add { min-width: 48px; height: 44px; font-size: 22px; }
+    .qty-badge { background: var(--accent); color: #1a1512; border-radius: 999px; padding: 1px 8px; font-size: 12px; font-weight: 800; margin-left: 6px; }
+
+    .cart-line { background: var(--card); border-radius: 10px; padding: 10px 12px; margin-top: 8px; }
+    .cart-line .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .mini { display: flex; align-items: center; gap: 6px; }
+    .mini button { width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--text); font-size: 18px; font-weight: 700; }
+    .note { margin-top: 8px; width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px dashed var(--line); background: transparent; color: var(--text); font-size: 14px; }
+
+    .in-progress { background: var(--card); border-radius: 10px; padding: 8px 12px; margin-top: 6px; display: flex; justify-content: space-between; font-size: 14px; }
+    .status-novo { color: var(--warn); } .status-preparando { color: var(--accent); }
+
+    .bottom { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(26,21,18,.97); border-top: 1px solid var(--line); padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }
+    .bottom .inner { max-width: 640px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+    .send { flex: 1; background: var(--ok); color: #10240c; border: none; padding: 16px; border-radius: 12px; font-size: 17px; font-weight: 800; }
+    .send:disabled { opacity: .4; }
+    .total { font-size: 20px; font-weight: 800; min-width: 110px; }
+    #toast { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); background: #2a221d; border: 1px solid var(--line); padding: 12px 18px; border-radius: 12px; z-index: 50; font-weight: 600; max-width: 90vw; box-shadow: 0 6px 20px rgba(0,0,0,.5); }
+    #toast.error { border-color: var(--bad); }
+    #toast.ok { border-color: var(--ok); }
+  </style>
 </head>
 <body>
+  <div class="wrap hidden" id="app">
+    <div class="top">
+      <span>👤 <span class="who" id="who"></span></span>
+      <button class="link" id="btn-logout">Sair</button>
+    </div>
+    <div class="warn hidden" id="cash-warning">⚠️ O caixa está fechado. Peça para a gerência abrir o caixa antes de lançar pedidos.</div>
 
-    <!-- TELA DE LOGIN POR PIN -->
-    <div id="login-screen">
-        <h2>☕ DUKAFE Atendimento</h2>
-        <p style="color: #a39183; font-size: 14px; margin-bottom: 20px;">Digite seu PIN de 4 dígitos</p>
-        <input type="password" id="pin-code" maxlength="4" class="pin-input" placeholder="••••" autofocus>
-        <button class="btn-login" onclick="realizarLogin()">ENTRAR</button>
+    <div id="ready-section" class="ready hidden">
+      <strong style="color:var(--ok)">🔔 Prontos para levar</strong>
+      <div id="ready-list"></div>
     </div>
 
-    <!-- APLICAÇÃO DE LANÇAMENTO -->
-    <div id="app-screen">
-        <div class="user-header">
-            <span>👤 <strong id="logged-user"></strong></span>
-            <button onclick="logout()" style="background:none; border:none; color:#e06d6d; cursor:pointer; font-weight:bold;">Sair</button>
-        </div>
-
-        <h2>Lançamento de Mesas</h2>
-        
-        <div class="form-group">
-            <label>Número da Mesa / Cliente:</label>
-            <input type="text" id="table-number" placeholder="Ex: Mesa 04 ou Maria">
-        </div>
-
-        <div class="form-group">
-            <label>👥 Quantidade de Pessoas na Mesa:</label>
-            <input type="number" id="people-count" min="1" value="1" placeholder="Ex: 3">
-        </div>
-
-        <!-- SECÇÃO DE PEDIDOS PRONTOS (Substitui o Pop-up) -->
-        <div id="ready-section" style="display: none;" class="ready-orders-section">
-            <h3 style="margin-top: 0; color: #588157; font-size: 16px;">🔔 Pedidos Prontos para Retirada</h3>
-            <div id="ready-orders-list"></div>
-        </div>
-
-        <h3>Cardápio</h3>
-        <div class="form-group">
-            <input type="text" id="search-product" class="search-input" placeholder="🔍 Pesquisar produto no cardápio..." oninput="filterProducts()">
-        </div>
-        <div id="products-list">A carregar produtos...</div>
-
-        <div class="cart-list">
-            <h3>Pedido Atual</h3>
-            <div id="cart-items">Carrinho vazio.</div>
-            <p style="font-weight: bold; font-size: 18px; margin-top: 10px;">Total: <span id="cart-total">R$ 0,00</span></p>
-            <button class="btn-send" onclick="sendOrder()">ENVIAR PARA A COZINHA 🚀</button>
-        </div>
+    <div class="row">
+      <div class="field">
+        <label for="table">Mesa / cliente</label>
+        <input id="table" class="input" maxlength="40" placeholder="Ex.: Mesa 4 ou Maria" autocomplete="off">
+      </div>
+      <div>
+        <label class="muted" style="display:block;font-weight:600;margin-bottom:4px">Pessoas</label>
+        <div class="stepper"><button id="people-dec">−</button><span id="people">1</span><button id="people-inc">+</button></div>
+      </div>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io();
-        let currentUser = null;
-        let products = [];
-        let cart = [];
-        let readyOrders = [];
+    <div id="progress-section" class="hidden">
+      <h3>Meus pedidos na cozinha</h3>
+      <div id="progress-list"></div>
+    </div>
 
-        // Ouve o aviso da cozinha e adiciona à lista visual (sem pop-up chato)
-        socket.on('order-ready', (order) => {
-            playAlertTone();
-            readyOrders.push(order);
-            renderReadyOrders();
+    <div id="cart-section" class="hidden">
+      <h3>Pedido atual</h3>
+      <div id="cart"></div>
+    </div>
+
+    <h3>Cardápio</h3>
+    <input id="search" class="input" placeholder="🔍 Buscar produto..." autocomplete="off">
+    <div class="pills" id="cats" style="margin-top:10px"></div>
+    <div id="products"><p class="muted">Carregando...</p></div>
+  </div>
+
+  <div class="bottom hidden" id="bottom">
+    <div class="inner">
+      <div class="total" id="total">R$ 0,00</div>
+      <button class="send" id="btn-send" disabled>ENVIAR PARA COZINHA</button>
+    </div>
+  </div>
+  <div id="toast" class="hidden"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/session.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+    const money = (v) => BRL.format(Number(v) || 0);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const hhmm = (iso) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+
+    const st = { me: null, products: [], categories: [], cat: 'all', cart: [], people: 1, kitchen: [], sending: false };
+
+    let toastTimer;
+    function toast(msg, type = 'ok') {
+      const t = $('toast');
+      t.textContent = msg; t.className = type; clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.classList.add('hidden'), 3500);
+    }
+
+    async function api(url, opts = {}) {
+      const o = { ...opts, headers: { 'Content-Type': 'application/json' } };
+      if (o.body && typeof o.body !== 'string') o.body = JSON.stringify(o.body);
+      let res;
+      try { res = await Session.fetch(url, o); } catch (e) { throw new Error('Sem conexão com o sistema. Confira o Wi-Fi.'); }
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error((data && data.error) || 'Erro ao concluir.');
+      return data;
+    }
+
+    // ---------- Som / vibração ----------
+    let audioCtx = null;
+    function unlockAudio() {
+      try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === 'suspended') audioCtx.resume(); } catch (e) { /* sem áudio */ }
+    }
+    document.addEventListener('pointerdown', unlockAudio, { passive: true });
+    function ding() {
+      try {
+        unlockAudio();
+        [0, 0.25].forEach((t) => {
+          const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+          o.connect(g); g.connect(audioCtx.destination);
+          o.frequency.value = 880; g.gain.setValueAtTime(0.2, audioCtx.currentTime + t);
+          o.start(audioCtx.currentTime + t); o.stop(audioCtx.currentTime + t + 0.18);
         });
+      } catch (e) { /* ok */ }
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    }
 
-        function renderReadyOrders() {
-            const section = document.getElementById('ready-section');
-            const container = document.getElementById('ready-orders-list');
-            
-            if (!readyOrders.length) {
-                section.style.display = 'none';
-                container.innerHTML = '';
-                return;
-            }
+    // ---------- Dados ----------
+    async function loadMenu() {
+      const [products, categories, cash] = await Promise.all([api('/api/products'), api('/api/categories'), api('/api/cash/status')]);
+      st.products = products; st.categories = categories;
+      $('cash-warning').classList.toggle('hidden', cash.open);
+      renderCats(); renderProducts(); renderCart();
+    }
+    async function loadKitchen() {
+      st.kitchen = await api('/api/kitchen/orders');
+      renderReady(); renderProgress();
+    }
 
-            section.style.display = 'block';
-            container.innerHTML = readyOrders.map((o, idx) => `
-                <div class="ready-card">
-                    <div>
-                        <strong>📌 ${o.table_number}</strong><br>
-                        <small style="color: #a39183;">Pedido #${o.id} - Pronto na Cozinha</small>
-                    </div>
-                    <button class="btn-dismiss" onclick="dismissOrder(${idx})">Entregue ✔</button>
-                </div>
-            `).join('');
-        }
+    // ---------- Pedidos prontos / em preparo ----------
+    function renderReady() {
+      const ready = st.kitchen.filter((o) => o.kitchen_status === 'pronto')
+        .sort((a, b) => (b.staff_name === st.me.name) - (a.staff_name === st.me.name));
+      $('ready-section').classList.toggle('hidden', !ready.length);
+      $('ready-list').innerHTML = ready.map((o) => `
+        <div class="ready-card ${o.staff_name === st.me.name ? 'mine' : ''}">
+          <div>
+            <strong>📌 ${esc(o.table_label)}</strong><br>
+            <small>#${o.id} • ${o.items.map((i) => `${i.quantity}× ${esc(i.product_name)}`).join(', ')}</small><br>
+            <small>${o.staff_name === st.me.name ? 'Seu pedido' : `De ${esc(o.staff_name)}`} • pronto ${hhmm(o.ready_at)}</small>
+          </div>
+          <button class="btn btn-ok" data-deliver="${o.id}">Entregue ✔</button>
+        </div>`).join('');
+    }
+    function renderProgress() {
+      const mine = st.kitchen.filter((o) => o.staff_name === st.me.name && ['novo', 'preparando'].includes(o.kitchen_status));
+      $('progress-section').classList.toggle('hidden', !mine.length);
+      $('progress-list').innerHTML = mine.map((o) => `
+        <div class="in-progress">
+          <span>📌 ${esc(o.table_label)} <span class="muted">#${o.id} • ${hhmm(o.created_at)}</span></span>
+          <strong class="status-${o.kitchen_status}">${o.kitchen_status === 'novo' ? 'Na fila' : 'Preparando'}</strong>
+        </div>`).join('');
+    }
 
-        function dismissOrder(idx) {
-            readyOrders.splice(idx, 1);
-            renderReadyOrders();
-        }
+    // ---------- Cardápio ----------
+    function renderCats() {
+      const cats = [{ id: 'all', name: 'Todos' }, ...st.categories.filter((c) => st.products.some((p) => p.category_id === c.id))];
+      $('cats').innerHTML = cats.map((c) => `<button class="pill ${String(st.cat) === String(c.id) ? 'active' : ''}" data-cat="${c.id}">${esc(c.name)}</button>`).join('');
+    }
+    const inCart = (id) => st.cart.filter((l) => l.product_id === id).reduce((s, l) => s + l.quantity, 0);
+    function renderProducts() {
+      const term = $('search').value.trim().toLowerCase();
+      const list = st.products.filter((p) => (st.cat === 'all' || String(p.category_id) === String(st.cat))
+        && (!term || p.name.toLowerCase().includes(term) || (p.category_name || '').toLowerCase().includes(term)));
+      $('products').innerHTML = list.length ? list.map((p) => {
+        const left = p.track_stock ? p.stock - inCart(p.id) : Infinity;
+        const q = inCart(p.id);
+        return `<div class="product ${left <= 0 ? 'out' : ''}">
+          <div><strong>${esc(p.name)}</strong>${q ? `<span class="qty-badge">${q}</span>` : ''}<br>
+            <span class="price">${money(p.sale_price)}</span> <span class="muted">${p.track_stock ? `• ${p.stock <= 0 ? 'esgotado' : `${p.stock} disp.`}` : ''}</span></div>
+          <button class="btn btn-accent add" data-add="${p.id}" ${left <= 0 ? 'disabled' : ''}>+</button>
+        </div>`;
+      }).join('') : '<p class="muted" style="text-align:center">Nenhum produto encontrado.</p>';
+    }
 
-        function playAlertTone() {
-            try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.frequency.value = 880;
-                gain.gain.setValueAtTime(0.15, ctx.currentTime);
-                osc.start();
-                osc.stop(ctx.currentTime + 0.4);
-            } catch (e) {}
-        }
+    // ---------- Carrinho ----------
+    function add(id) {
+      const p = st.products.find((x) => x.id === id);
+      if (!p) return;
+      if (p.track_stock && inCart(id) + 1 > p.stock) return toast(`Só tem ${p.stock} de ${p.name}.`, 'error');
+      const line = st.cart.find((l) => l.product_id === id && !l.notes);
+      if (line) line.quantity++;
+      else st.cart.push({ key: Date.now() + Math.random(), product_id: id, name: p.name, price: p.sale_price, quantity: 1, notes: '' });
+      renderCart(); renderProducts();
+    }
+    function renderCart() {
+      $('cart-section').classList.toggle('hidden', !st.cart.length);
+      $('cart').innerHTML = st.cart.map((l) => `
+        <div class="cart-line">
+          <div class="head">
+            <div><strong>${esc(l.name)}</strong><br><span class="muted">${money(l.price * l.quantity)}</span></div>
+            <div class="mini">
+              <button data-dec="${l.key}">−</button><strong style="min-width:22px;text-align:center">${l.quantity}</strong><button data-inc="${l.key}">+</button>
+            </div>
+          </div>
+          <input class="note" data-note="${l.key}" maxlength="140" placeholder="📝 Observação (ex.: sem açúcar)" value="${esc(l.notes)}">
+        </div>`).join('');
+      const total = st.cart.reduce((s, l) => s + l.price * l.quantity, 0);
+      $('total').textContent = money(total);
+      $('btn-send').disabled = !st.cart.length || st.sending;
+    }
+    function lineByKey(k) { return st.cart.find((l) => String(l.key) === String(k)); }
 
-        async function realizarLogin() {
-            const pin = document.getElementById('pin-code').value.trim();
-            if (pin.length !== 4) {
-                alert('O PIN deve conter 4 dígitos.');
-                return;
-            }
-
-            try {
-                const res = await fetch('/api/auth/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ pin })
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error);
-
-                currentUser = data.staff;
-                document.getElementById('logged-user').textContent = currentUser.name;
-                document.getElementById('login-screen').style.display = 'none';
-                document.getElementById('app-screen').style.display = 'block';
-                loadProducts();
-            } catch (e) {
-                alert(e.message);
-                document.getElementById('pin-code').value = '';
-            }
-        }
-
-        function logout() {
-            currentUser = null;
-            cart = [];
-            readyOrders = [];
-            renderReadyOrders();
-            document.getElementById('pin-code').value = '';
-            document.getElementById('app-screen').style.display = 'none';
-            document.getElementById('login-screen').style.display = 'block';
-        }
-
-        async function loadProducts() {
-            try {
-                const res = await fetch('/api/products');
-                products = await res.json();
-                renderProducts(products);
-            } catch (e) {
-                alert('Erro ao carregar produtos.');
-            }
-        }
-
-        function filterProducts() {
-            const term = document.getElementById('search-product').value.toLowerCase();
-            const filtered = products.filter(p => p.name.toLowerCase().includes(term) || (p.category_name && p.category_name.toLowerCase().includes(term)));
-            renderProducts(filtered);
-        }
-
-        function renderProducts(list) {
-            const container = document.getElementById('products-list');
-            if (!list.length) {
-                container.innerHTML = '<p style="text-align:center; color:#887568;">Nenhum produto encontrado.</p>';
-                return;
-            }
-            container.innerHTML = list.map(p => `
-                <div class="product-card">
-                    <div>
-                        <strong>${p.name}</strong><br>
-                        <small style="color: #d4a373;">R$ ${p.sale_price.toFixed(2)} (Stock: ${p.stock})</small>
-                    </div>
-                    <button class="btn-add" onclick="addToCart(${p.id})">+ Adicionar</button>
-                </div>
-            `).join('');
-        }
-
-        function addToCart(id) {
-            const prod = products.find(p => p.id === id);
-            const item = cart.find(i => i.product_id === id);
-            const currentQtyInCart = item ? item.quantity : 0;
-
-            if (prod.stock <= currentQtyInCart) {
-                alert(`Stock insuficiente! Apenas ${prod.stock} unidades disponíveis.`);
-                return;
-            }
-
-            if (item) {
-                item.quantity++;
-            } else {
-                cart.push({ product_id: prod.id, name: prod.name, sale_price: prod.sale_price, quantity: 1 });
-            }
-            renderCart();
-        }
-
-        function renderCart() {
-            const container = document.getElementById('cart-items');
-            if (!cart.length) {
-                container.innerHTML = 'Carrinho vazio.';
-                document.getElementById('cart-total').textContent = 'R$ 0,00';
-                return;
-            }
-            let total = 0;
-            container.innerHTML = cart.map((i, idx) => {
-                total += i.sale_price * i.quantity;
-                return `<div style="display:flex; justify-content:space-between; margin-bottom:5px; align-items:center;">
-                    <span>${i.name} (x${i.quantity})</span>
-                    <span>R$ ${(i.sale_price * i.quantity).toFixed(2)}</span>
-                    <button onclick="removeItem(${idx})" style="background:none; border:none; color:#e06d6d; cursor:pointer; font-size:16px;">❌</button>
-                </div>`;
-            }).join('');
-            document.getElementById('cart-total').textContent = `R$ ${total.toFixed(2)}`;
-        }
-
-        function removeItem(idx) {
-            cart.splice(idx, 1);
-            renderCart();
-        }
-
-        async function sendOrder() {
-            const table = document.getElementById('table-number').value.trim();
-            const people = document.getElementById('people-count').value.trim() || '1';
-            
-            if (!table) return alert('Informe o número da mesa ou nome do cliente.');
-            if (!cart.length) return alert('O carrinho está vazio.');
-
-            const tableFormatted = `${table} (${people} ${people === '1' ? 'pessoa' : 'pessoas'}) - Atend.: ${currentUser.name}`;
-
-            try {
-                const res = await fetch('/api/orders', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        table_number: tableFormatted,
-                        items: cart.map(i => ({ product_id: i.product_id, quantity: i.quantity }))
-                    })
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error);
-
-                alert('Pedido enviado para a cozinha com sucesso! ☕');
-                cart = [];
-                document.getElementById('table-number').value = '';
-                document.getElementById('people-count').value = '1';
-                renderCart();
-                loadProducts(); // Atualiza o stock visualmente
-            } catch (e) {
-                alert(e.message);
-            }
-        }
-
-        document.getElementById('pin-code').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') realizarLogin();
+    async function send() {
+      const table = $('table').value.trim();
+      if (!table) { $('table').focus(); return toast('Informe a mesa ou o nome do cliente.', 'error'); }
+      if (!st.cart.length || st.sending) return;
+      st.sending = true; renderCart();
+      try {
+        const order = await api('/api/orders', {
+          method: 'POST',
+          body: {
+            table_label: table,
+            people: st.people,
+            items: st.cart.map((l) => ({ product_id: l.product_id, quantity: l.quantity, notes: l.notes })),
+          },
         });
-    </script>
+        toast(`Pedido #${order.id} (${table}) enviado para a cozinha ☕`);
+        st.cart = []; st.people = 1; $('people').textContent = '1'; $('table').value = '';
+        await Promise.all([loadMenu(), loadKitchen()]);
+      } catch (e) {
+        toast(e.message, 'error');
+        loadMenu();
+      } finally {
+        st.sending = false; renderCart();
+      }
+    }
+
+    // ---------- Eventos ----------
+    document.addEventListener('click', async (e) => {
+      const t = e.target.closest('button');
+      if (!t) return;
+      if (t.dataset.add) return add(Number(t.dataset.add));
+      if (t.dataset.cat) { st.cat = t.dataset.cat === 'all' ? 'all' : Number(t.dataset.cat); renderCats(); return renderProducts(); }
+      if (t.dataset.inc) {
+        const l = lineByKey(t.dataset.inc); const p = st.products.find((x) => x.id === l.product_id);
+        if (p.track_stock && inCart(l.product_id) + 1 > p.stock) return toast(`Só tem ${p.stock} de ${p.name}.`, 'error');
+        l.quantity++; renderCart(); return renderProducts();
+      }
+      if (t.dataset.dec) {
+        const l = lineByKey(t.dataset.dec); l.quantity--;
+        if (l.quantity <= 0) st.cart = st.cart.filter((x) => x !== l);
+        renderCart(); return renderProducts();
+      }
+      if (t.dataset.deliver) {
+        t.disabled = true;
+        try { await api(`/api/orders/${t.dataset.deliver}/status`, { method: 'POST', body: { status: 'entregue' } }); await loadKitchen(); }
+        catch (err) { toast(err.message, 'error'); t.disabled = false; }
+      }
+    });
+    document.addEventListener('input', (e) => {
+      if (e.target.dataset && e.target.dataset.note) { const l = lineByKey(e.target.dataset.note); if (l) l.notes = e.target.value; }
+    });
+    $('search').addEventListener('input', renderProducts);
+    $('people-inc').addEventListener('click', () => { st.people = Math.min(99, st.people + 1); $('people').textContent = st.people; });
+    $('people-dec').addEventListener('click', () => { st.people = Math.max(1, st.people - 1); $('people').textContent = st.people; });
+    $('btn-send').addEventListener('click', send);
+    $('btn-logout').addEventListener('click', () => { if (confirm('Sair? O pedido não enviado será perdido.')) Session.logout(); });
+
+    // ---------- Início ----------
+    (async () => {
+      st.me = await Session.ensure();
+      $('who').textContent = st.me.name;
+      $('app').classList.remove('hidden'); $('bottom').classList.remove('hidden');
+      try { await Promise.all([loadMenu(), loadKitchen()]); } catch (e) { toast(e.message, 'error'); }
+
+      const socket = Session.socket();
+      socket.on('connect', () => loadKitchen().catch(() => {}));
+      socket.on('order:new', () => loadKitchen().catch(() => {}));
+      socket.on('order:update', (o) => {
+        const before = st.kitchen.find((x) => x.id === o.id);
+        if (o.kitchen_status === 'pronto' && (!before || before.kitchen_status !== 'pronto')) {
+          ding();
+          toast(`🔔 ${o.table_label} está pronto!${o.staff_name === st.me.name ? ' (seu pedido)' : ''}`);
+        }
+        loadKitchen().catch(() => {});
+      });
+      socket.on('stock:changed', () => loadMenu().catch(() => {}));
+      socket.on('cash:changed', () => loadMenu().catch(() => {}));
+    })();
+  </script>
 </body>
 </html>
